@@ -508,8 +508,6 @@ export default function App() {
             bots={bots}
             onToggleBot={handleToggleBot}
             onDeleteBot={handleDeleteBot}
-            onCreateBot={handleCreateBot}
-            currentConfigLabel={currentConfigLabel}
           />
         )}
 

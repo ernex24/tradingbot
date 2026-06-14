@@ -478,9 +478,6 @@ function BotCard({ bot, onToggle, onDelete, onCloseBotPosition }) {
             {config.takePct > 0 && ` · TP ${config.takePct}%`}
             {' · '}{config.compound ? 'compounding' : 'fixed size'}
           </div>
-          {S.description && (
-            <div className="bot-strategy-desc">{S.description}</div>
-          )}
           {state.lastError && (
             <div style={{ color: 'var(--neg)', fontSize: 12, marginTop: 4 }}>
               ⚠ Last tick error: {state.lastError}

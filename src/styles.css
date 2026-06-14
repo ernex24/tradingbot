@@ -102,12 +102,6 @@ header .meta { text-align: right; font-size: 13px; color: var(--mute); }
   font-weight: 600;
   padding-top: 28px;
 }
-.ctl-stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s3);
-  flex: 1;
-}
 .ctl-row {
   display: flex;
   flex-wrap: wrap;
@@ -498,29 +492,6 @@ input[type=date] {
 .btn-close-now {
   font-size: 12px;
   padding: 6px 12px;
-}
-
-.strategy-explanation {
-  background: #fff8e1;
-  border-left: 3px solid #f4c430;
-  padding: 10px var(--s3);
-  font-size: 13px;
-  color: #5a4a00;
-  line-height: 1.55;
-  border-radius: 2px;
-  max-width: 720px;
-}
-
-.bot-strategy-desc {
-  background: var(--subtle);
-  border-left: 3px solid var(--accent);
-  padding: 8px var(--s3);
-  font-size: 12px;
-  color: var(--ink);
-  line-height: 1.5;
-  margin-top: var(--s2);
-  border-radius: 2px;
-  max-width: 720px;
 }
 
 .open-summary {

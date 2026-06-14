@@ -138,10 +138,11 @@ function BinanceTestnetForm({ onSaved }) {
   )
 }
 
-function BinanceBalanceCard({ testnet }) {
+function BinanceBalanceCard({ testnet, refreshKey }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
+  const [query, setQuery] = useState('')
 
   const load = async () => {
     setErr(''); setLoading(true)
@@ -156,7 +157,13 @@ function BinanceBalanceCard({ testnet }) {
       setLoading(false)
     }
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [refreshKey])
+
+  const filtered = data?.balances?.filter(b =>
+    !query || b.asset.toLowerCase().includes(query.toLowerCase())
+  ) || []
+
+  const fmt = n => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })
 
   return (
     <div className="balance-card">
@@ -171,35 +178,251 @@ function BinanceBalanceCard({ testnet }) {
         <>
           <div style={{ fontSize: 12, color: 'var(--mute)', marginTop: 6 }}>
             Account type: {data.accountType || '?'} · canTrade: {data.canTrade ? 'yes' : 'no'} ·
-            permissions: {(data.permissions || []).join(', ') || '—'}
+            permissions: {(data.permissions || []).join(', ') || '—'} ·
+            {' '}{data.balances.length} assets
           </div>
+          {data.balances.length > 0 && (
+            <input
+              type="search"
+              className="balance-filter"
+              placeholder="Filter by asset (e.g. BTC, USDT)…"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+            />
+          )}
           {data.balances.length === 0 ? (
             <div style={{ color: 'var(--mute)', padding: 'var(--s2) 0' }}>
               No assets with positive balance.
             </div>
           ) : (
-            <table style={{ marginTop: 8 }}>
+            <div className="balance-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Asset</th>
+                    <th className="r">Free</th>
+                    <th className="r">Locked</th>
+                    <th className="r">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" style={{ color: 'var(--mute)', padding: 'var(--s2) 0' }}>
+                        No assets match "{query}".
+                      </td>
+                    </tr>
+                  ) : filtered.map(b => (
+                    <tr key={b.asset}>
+                      <td>{b.asset}</td>
+                      <td className="r num">{fmt(b.free)}</td>
+                      <td className="r num">{fmt(b.locked)}</td>
+                      <td className="r num"><b>{fmt(b.total)}</b></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+const QUICK_PAIRS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT']
+
+function OrderPanel({ testnet, onAfterFill }) {
+  const [symbol, setSymbol] = useState('BTCUSDT')
+  const [side, setSide] = useState('BUY')
+  const [type, setType] = useState('MARKET')
+  const [quoteOrderQty, setQuoteOrderQty] = useState('100')
+  const [quantity, setQuantity] = useState('')
+  const [price, setPrice] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState(null)
+  const [err, setErr] = useState('')
+  const [openOrders, setOpenOrders] = useState([])
+
+  const loadOpen = async () => {
+    try {
+      const r = await authFetch(`/api/binance/orders?testnet=${testnet ? 1 : 0}`)
+      const d = await r.json()
+      if (r.ok) setOpenOrders(d.orders || [])
+    } catch {}
+  }
+  useEffect(() => { loadOpen() }, [])
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setErr(''); setResult(null); setBusy(true)
+    try {
+      const body = { testnet: !!testnet, symbol, side, type }
+      if (type === 'MARKET') {
+        if (side === 'BUY' && quoteOrderQty) body.quoteOrderQty = +quoteOrderQty
+        else if (quantity) body.quantity = +quantity
+        else body.quoteOrderQty = +quoteOrderQty
+      } else {
+        body.quantity = +quantity
+        body.price = +price
+      }
+      const r = await authFetch('/api/binance/order', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data.error || 'failed')
+      setResult(data)
+      loadOpen()
+      onAfterFill?.()
+    } catch (e) {
+      setErr(e.message || String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const fmt = (n, d = 4) =>
+    n == null ? '—' : Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: d })
+
+  return (
+    <div className="order-panel">
+      <div className="label" style={{ marginBottom: 'var(--s2)' }}>Place test order</div>
+
+      <form onSubmit={submit} className="order-form">
+        <div className="order-row">
+          <label className="ofield">
+            <span>Symbol</span>
+            <select value={symbol} onChange={e => setSymbol(e.target.value)}>
+              {QUICK_PAIRS.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </label>
+
+          <label className="ofield">
+            <span>Side</span>
+            <div className="side-toggle">
+              <button
+                type="button"
+                className={'side-btn' + (side === 'BUY' ? ' on buy' : '')}
+                onClick={() => setSide('BUY')}
+              >BUY</button>
+              <button
+                type="button"
+                className={'side-btn' + (side === 'SELL' ? ' on sell' : '')}
+                onClick={() => setSide('SELL')}
+              >SELL</button>
+            </div>
+          </label>
+
+          <label className="ofield">
+            <span>Type</span>
+            <select value={type} onChange={e => setType(e.target.value)}>
+              <option value="MARKET">MARKET</option>
+              <option value="LIMIT">LIMIT</option>
+            </select>
+          </label>
+        </div>
+
+        {type === 'MARKET' && side === 'BUY' && (
+          <label className="ofield ofield-wide">
+            <span>Spend (USDT)</span>
+            <input
+              type="number" min="0" step="0.01"
+              value={quoteOrderQty}
+              onChange={e => setQuoteOrderQty(e.target.value)}
+              placeholder="e.g. 100 = buy $100 worth"
+            />
+          </label>
+        )}
+        {type === 'MARKET' && side === 'SELL' && (
+          <label className="ofield ofield-wide">
+            <span>Quantity (base asset)</span>
+            <input
+              type="number" min="0" step="0.00001"
+              value={quantity}
+              onChange={e => setQuantity(e.target.value)}
+              placeholder="e.g. 0.001 BTC"
+            />
+          </label>
+        )}
+        {type === 'LIMIT' && (
+          <div className="order-row">
+            <label className="ofield">
+              <span>Quantity</span>
+              <input
+                type="number" min="0" step="0.00001"
+                value={quantity} onChange={e => setQuantity(e.target.value)}
+              />
+            </label>
+            <label className="ofield">
+              <span>Price (USDT)</span>
+              <input
+                type="number" min="0" step="0.01"
+                value={price} onChange={e => setPrice(e.target.value)}
+              />
+            </label>
+          </div>
+        )}
+
+        <button type="submit" className={'btn order-submit ' + (side === 'BUY' ? 'buy' : 'sell')} disabled={busy}>
+          {busy ? 'Sending…' : `${side} ${symbol}`}
+        </button>
+        {err && <div className="warn" style={{ marginTop: 8 }}>{err}</div>}
+      </form>
+
+      {result && (
+        <div className="order-result">
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>
+            ✓ Order #{result.orderId} {result.status}
+          </div>
+          <div style={{ fontSize: 13 }}>
+            Filled <b>{fmt(result.executedQty, 8)}</b> of {result.symbol}
+            {result.avgPrice != null && <> at avg <b>${fmt(result.avgPrice, 4)}</b></>}
+            {' '}for total <b>${fmt(result.cummulativeQuoteQty, 4)} USDT</b>
+          </div>
+          {result.fills?.length > 0 && (
+            <div className="fills-list">
+              {result.fills.map((f, i) => (
+                <div key={i} className="fill-line">
+                  fill {i + 1}: {fmt(+f.qty, 8)} @ ${fmt(+f.price, 4)}
+                  {' '}· fee {fmt(+f.commission, 8)} {f.commissionAsset}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {openOrders.length > 0 && (
+        <div style={{ marginTop: 'var(--s4)' }}>
+          <div className="label" style={{ marginBottom: 'var(--s2)' }}>
+            Open orders ({openOrders.length})
+          </div>
+          <div className="balance-scroll">
+            <table>
               <thead>
                 <tr>
-                  <th>Asset</th>
-                  <th className="r">Free</th>
-                  <th className="r">Locked</th>
-                  <th className="r">Total</th>
+                  <th>#</th><th>Symbol</th><th>Side</th><th>Type</th>
+                  <th className="r">Qty</th><th className="r">Filled</th>
+                  <th className="r">Price</th>
                 </tr>
               </thead>
               <tbody>
-                {data.balances.map(b => (
-                  <tr key={b.asset}>
-                    <td>{b.asset}</td>
-                    <td className="r num">{b.free.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
-                    <td className="r num">{b.locked.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
-                    <td className="r num"><b>{b.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</b></td>
+                {openOrders.map(o => (
+                  <tr key={o.orderId}>
+                    <td className="num">{o.orderId}</td>
+                    <td>{o.symbol}</td>
+                    <td>{o.side}</td>
+                    <td>{o.type}</td>
+                    <td className="r num">{fmt(o.origQty, 8)}</td>
+                    <td className="r num">{fmt(o.executedQty, 8)}</td>
+                    <td className="r num">{fmt(o.price, 4)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          )}
-        </>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -309,6 +532,7 @@ export default function AccountView() {
   const [session, setSession] = useState(null)
   const [keys, setKeys] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [balanceRefresh, setBalanceRefresh] = useState(0)
 
   useEffect(() => {
     if (!supabase) { setLoading(false); return }
@@ -396,7 +620,10 @@ export default function AccountView() {
               onDisconnect={refreshKeys}
             />
             <div style={{ marginTop: 'var(--s4)' }}>
-              <BinanceBalanceCard testnet={true} />
+              <BinanceBalanceCard testnet={true} refreshKey={balanceRefresh} />
+            </div>
+            <div style={{ marginTop: 'var(--s4)' }}>
+              <OrderPanel testnet={true} onAfterFill={() => setBalanceRefresh(k => k + 1)} />
             </div>
           </>
         ) : (

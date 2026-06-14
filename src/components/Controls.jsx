@@ -1,7 +1,14 @@
 import { STRATS } from '../lib/strategies.js'
 
+const TIMEFRAMES = [
+  { value: '60', label: '1 hour' },
+  { value: '240', label: '4 hours' },
+  { value: '1440', label: '1 day' },
+]
+
 export default function Controls({
   stratKey, params, onStratChange, onParamChange,
+  interval, onIntervalChange,
   desde, hasta, minDate, maxDate, onDateChange, onResetRange,
   onReload, loading,
 }) {
@@ -18,6 +25,20 @@ export default function Controls({
         >
           {Object.entries(STRATS).map(([k, s]) => (
             <option key={k} value={k}>{s.nombre}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="ctl">
+        <label htmlFor="tf">Timeframe</label>
+        <select
+          id="tf"
+          value={interval}
+          onChange={e => onIntervalChange(e.target.value)}
+          disabled={loading}
+        >
+          {TIMEFRAMES.map(t => (
+            <option key={t.value} value={t.value}>{t.label}</option>
           ))}
         </select>
       </div>

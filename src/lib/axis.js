@@ -1,18 +1,24 @@
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-export function shortDate(iso) {
-  // iso: 'YYYY-MM-DD'
-  if (!iso) return ''
-  const [, m, d] = iso.split('-')
-  const mes = MONTHS[+m - 1] ?? m
-  return `${mes} ${+d}`
+// Accepts either 'YYYY-MM-DD' (daily) or 'YYYY-MM-DD HH:mm' (intraday).
+export function shortDate(s) {
+  if (!s) return ''
+  const [date, time] = s.split(' ')
+  const parts = date.split('-')
+  if (parts.length < 3) return s
+  const mes = MONTHS[+parts[1] - 1] ?? parts[1]
+  const day = +parts[2]
+  if (!time) return `${mes} ${day}`
+  return `${mes} ${day} ${time.slice(0, 2)}h`
 }
 
-export function dateWithYear(iso) {
-  if (!iso) return ''
-  const [y, m, d] = iso.split('-')
+export function dateWithYear(s) {
+  if (!s) return ''
+  const [date, time] = s.split(' ')
+  const [y, m, d] = date.split('-')
   const mes = MONTHS[+m - 1] ?? m
-  return `${mes} ${+d}, ${y}`
+  if (!time) return `${mes} ${+d}, ${y}`
+  return `${mes} ${+d}, ${y} ${time.slice(0, 5)}`
 }
 
 // Pick ~`count` evenly spaced indices spanning [0, n-1].

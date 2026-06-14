@@ -14,21 +14,24 @@ function defaultParams(stratKey) {
   return out
 }
 
+// Candle `f` is either 'YYYY-MM-DD' or 'YYYY-MM-DD HH:mm'.
+const datePart = s => (s ? s.slice(0, 10) : '')
+
 export default function App() {
   const [candles, setCandles] = useState(DEMO_CANDLES)
   const [dataSrc, setDataSrc] = useState('demo data')
   const [updatedAt, setUpdatedAt] = useState('')
   const [stratKey, setStratKey] = useState('ma')
   const [params, setParams] = useState(() => defaultParams('ma'))
+  const [interval, setIntervalState] = useState('1440')
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
 
-  const minDate = candles[0]?.f ?? ''
-  const maxDate = candles[candles.length - 1]?.f ?? ''
+  const minDate = datePart(candles[0]?.f)
+  const maxDate = datePart(candles[candles.length - 1]?.f)
   const [desde, setDesde] = useState(minDate)
   const [hasta, setHasta] = useState(maxDate)
 
-  // Reset range when candles change (data reload).
   useEffect(() => {
     setDesde(minDate)
     setHasta(maxDate)
@@ -38,7 +41,10 @@ export default function App() {
     if (!desde && !hasta) return candles
     const lo = desde || minDate
     const hi = hasta || maxDate
-    return candles.filter(c => c.f >= lo && c.f <= hi)
+    return candles.filter(c => {
+      const d = datePart(c.f)
+      return d >= lo && d <= hi
+    })
   }, [candles, desde, hasta, minDate, maxDate])
 
   const S = STRATS[stratKey]
@@ -74,11 +80,12 @@ export default function App() {
     setHasta(maxDate)
   }
 
-  const cargarKraken = async () => {
+  const cargarKraken = async (forceInterval) => {
+    const iv = forceInterval ?? interval
     setLoading(true)
     setLoadError('')
     try {
-      const r = await fetch('/api/kraken?pair=XBTUSD&interval=1440')
+      const r = await fetch(`/api/kraken?pair=XBTUSD&interval=${iv}`)
       if (!r.ok) throw new Error('HTTP ' + r.status)
       const data = await r.json()
       if (data.error && data.error.length) {
@@ -86,15 +93,20 @@ export default function App() {
       }
       const key = Object.keys(data.result).find(k => k !== 'last')
       const rows = data.result[key]
-      const next = rows.map(row => ({
-        f: new Date(row[0] * 1000).toISOString().slice(0, 10),
-        o: Math.round(+row[1]),
-        h: Math.round(+row[2]),
-        l: Math.round(+row[3]),
-        c: Math.round(+row[4]),
-      }))
+      const intraday = iv !== '1440'
+      const next = rows.map(row => {
+        const iso = new Date(+row[0] * 1000).toISOString()
+        return {
+          f: intraday ? iso.slice(0, 16).replace('T', ' ') : iso.slice(0, 10),
+          o: Math.round(+row[1]),
+          h: Math.round(+row[2]),
+          l: Math.round(+row[3]),
+          c: Math.round(+row[4]),
+        }
+      })
       setCandles(next)
-      setDataSrc('live data · Kraken')
+      const ivLabel = iv === '60' ? '1h' : iv === '240' ? '4h' : '1d'
+      setDataSrc(`live data · Kraken · ${ivLabel}`)
       setUpdatedAt('Updated ' + new Date().toLocaleString('en-US'))
     } catch (e) {
       console.warn('Kraken fetch failed:', e)
@@ -103,6 +115,11 @@ export default function App() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleIntervalChange = (iv) => {
+    setIntervalState(iv)
+    cargarKraken(iv)
   }
 
   const [l1, l2] = S.leyenda(params)
@@ -132,13 +149,15 @@ export default function App() {
           params={params}
           onStratChange={handleStratChange}
           onParamChange={handleParamChange}
+          interval={interval}
+          onIntervalChange={handleIntervalChange}
           desde={desde}
           hasta={hasta}
           minDate={minDate}
           maxDate={maxDate}
           onDateChange={handleDateChange}
           onResetRange={resetRange}
-          onReload={cargarKraken}
+          onReload={() => cargarKraken()}
           loading={loading}
         />
 

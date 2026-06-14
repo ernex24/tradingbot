@@ -550,15 +550,17 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot, onCloseBotP
 
       {bots.length > 0 && (
         <div className="bot-list">
-          {bots.map(b => (
-            <BotCard
-              key={b.id}
-              bot={b}
-              onToggle={onToggleBot}
-              onDelete={onDeleteBot}
-              onCloseBotPosition={onCloseBotPosition}
-            />
-          ))}
+          {[...bots]
+            .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+            .map(b => (
+              <BotCard
+                key={b.id}
+                bot={b}
+                onToggle={onToggleBot}
+                onDelete={onDeleteBot}
+                onCloseBotPosition={onCloseBotPosition}
+              />
+            ))}
         </div>
       )}
 

@@ -19,6 +19,7 @@ function applyDirection(signalLong, direction) {
 export const STRATS = {
   ma: {
     nombre: 'Moving average cross',
+    description: 'Enters long when the fast moving average crosses above the slow one and exits when it crosses back below. Rides sustained trends well but tends to enter late and get whipsawed in sideways markets.',
     supportsDirection: true,
     params: [
       { k: 'corta', label: 'Short MA', def: 10, min: 2, max: 100 },
@@ -44,6 +45,7 @@ export const STRATS = {
 
   rsi: {
     nombre: 'RSI · mean reversion',
+    description: 'Buys when RSI drops below the oversold level, exits when RSI rises above the overbought level. Bets that price snaps back to its mean after extremes. Works in ranging markets, suffers in strong trends.',
     supportsDirection: true,
     params: [
       { k: 'periodo', label: 'RSI period', def: 14, min: 2, max: 50 },
@@ -79,6 +81,7 @@ export const STRATS = {
 
   brk: {
     nombre: 'Breakout',
+    description: 'Enters when price breaks above the highest high of the lookback window, exits when it breaks below the lowest low. Classic Donchian-style trend follower made famous by the Turtle Traders. Catches big moves but pays many small losses on false breakouts.',
     supportsDirection: true,
     params: [
       { k: 'lookback', label: 'Lookback', def: 20, min: 5, max: 80 },
@@ -111,6 +114,7 @@ export const STRATS = {
 
   hold: {
     nombre: 'Buy and hold',
+    description: 'Buys at the start of the period and holds until the end. No timing decisions. Use as the baseline to judge whether the other strategies actually beat doing nothing.',
     supportsDirection: false,
     params: [],
     leyenda: () => ['Price', '—'],

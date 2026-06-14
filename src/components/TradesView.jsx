@@ -109,6 +109,123 @@ function buildChartData(bot) {
   return { recent, lines, trades }
 }
 
+function OpenPositionSummary({ bot, coin, onCloseOpen }) {
+  const op = bot.state.openPosition
+  const [closing, setClosing] = useState(false)
+  if (!op) return null
+  const live = bot.state.lastPrice
+  const fp = live ? floatingPnL(op, live) : 0
+  const total = op.invested + fp
+
+  const handleClose = async () => {
+    if (closing) return
+    if (!confirm(`Sell ${fmtQty(op.qty, coin.symbol)} at market and close this position?`)) return
+    setClosing(true)
+    try {
+      await onCloseOpen(bot.id)
+    } catch (e) {
+      alert('Failed to close: ' + (e?.message || e))
+    } finally {
+      setClosing(false)
+    }
+  }
+
+  return (
+    <div className="open-summary">
+      <div className="open-summary-main">
+        <div>
+          <span className="tag tag-open-pos">OPEN</span>{' '}
+          {sideTag(op.side)}{' '}
+          <b>{fmtQty(op.qty, coin.symbol)}</b>{' '}
+          · entry {price(op.entryPrice)}
+          {live && (
+            <>
+              {' '}· live {price(live)}{' '}
+              <span className={fp >= 0 ? 'pos' : 'neg'}>
+                ({signed(fp)} → {usdPrecise(total)})
+              </span>
+            </>
+          )}
+        </div>
+        <button
+          type="button"
+          className="btn-ghost btn-danger btn-close-now"
+          onClick={handleClose}
+          disabled={closing || !onCloseOpen}
+          title="Send a MARKET SELL to Binance Testnet for the full position quantity"
+        >
+          {closing ? 'Selling…' : 'Close now'}
+        </button>
+      </div>
+      <div className="open-summary-sub">
+        SL {op.slPrice ? price(op.slPrice) : 'off'}
+        {' · TP '}{op.tpPrice ? price(op.tpPrice) : 'off'}
+        {' · invested '}{usdPrecise(op.invested)}
+      </div>
+    </div>
+  )
+}
+
+function ClosedTradesTable({ trades, symbol }) {
+  if (!trades.length) {
+    return <div className="closed-empty">No closed trades yet.</div>
+  }
+  const rows = [...trades].reverse()
+  return (
+    <div className="bot-trades">
+      <div className="label" style={{ marginBottom: 'var(--s2)' }}>
+        Closed trades ({trades.length})
+      </div>
+      <div className="bot-trades-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Side</th>
+              <th>Bought</th>
+              <th>Sold</th>
+              <th className="r">Result (net)</th>
+              <th className="r">Fees</th>
+              <th className="r">P&amp;L</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((t, i) => {
+              const idx = trades.length - i
+              const cls = t.netPct >= 0 ? 'pos' : 'neg'
+              return (
+                <tr key={`${t.exitTime}-${t.entryTime}`}>
+                  <td className="num">{idx}</td>
+                  <td>{sideTag(t.side)}</td>
+                  <td className="num">
+                    {timestamp(t.entryTime)} · {price(t.entryPrice)}
+                    <div style={{ color: 'var(--mute)', fontSize: 11 }}>
+                      {fmtQty(t.qty, symbol)} for {usdPrecise(t.invested)}
+                    </div>
+                  </td>
+                  <td className="num">
+                    {timestamp(t.exitTime)} · {price(t.exitPrice)} {reasonTag(t.reason)}
+                  </td>
+                  <td className={`r num ${cls}`}>{pct(t.netPct)}</td>
+                  <td className="r num" style={{ color: 'var(--mute)' }}>
+                    {usdPrecise(t.feeUSD ?? 0)}
+                  </td>
+                  <td className={`r num ${cls}`}>
+                    {signed(t.pnlUSD)}
+                    <div style={{ color: 'var(--mute)', fontSize: 11, fontWeight: 400 }}>
+                      → {usdPrecise(t.invested + t.pnlUSD)}
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 function DeleteDialog({ bot, busy, onCloseAndDelete, onDeleteOnly, onCancel }) {
   const op = bot.state.openPosition
   const coin = coinByPair(bot.config.pair)
@@ -346,6 +463,7 @@ function BotCard({ bot, onToggle, onDelete, onCloseBotPosition }) {
     onDelete(bot.id)
     setDeleting(false)
   }
+  const [expanded, setExpanded] = useState(false)
 
   return (
     <div className="bot-card">
@@ -360,6 +478,9 @@ function BotCard({ bot, onToggle, onDelete, onCloseBotPosition }) {
             {config.takePct > 0 && ` · TP ${config.takePct}%`}
             {' · '}{config.compound ? 'compounding' : 'fixed size'}
           </div>
+          {S.description && (
+            <div className="bot-strategy-desc">{S.description}</div>
+          )}
           {state.lastError && (
             <div style={{ color: 'var(--neg)', fontSize: 12, marginTop: 4 }}>
               ⚠ Last tick error: {state.lastError}
@@ -411,32 +532,52 @@ function BotCard({ bot, onToggle, onDelete, onCloseBotPosition }) {
         </div>
       </div>
 
-      <div className="bot-chart">
-        <div className="bot-chart-head">
-          <div className="label">Live · last {chart ? chart.recent.length : 0} candles</div>
-          <div className="legend">
-            <span><span className="sw" style={{ background: 'var(--accent)' }}></span>{l1}</span>
-            <span><span className="sw" style={{ background: '#9aa0a6' }}></span>{l2}</span>
-            <span><span className="tri-up"></span>Buy</span>
-            <span><span className="tri-dn"></span>Sell</span>
-          </div>
-        </div>
-        {chart ? (
-          <PriceChart
-            candles={chart.recent}
-            lines={chart.lines}
-            trades={chart.trades}
-            height={220}
-            symbol={coin.symbol}
-          />
-        ) : (
-          <div className="bot-chart-empty">
-            Waiting for first live candles… (poll every 30s)
+      <OpenPositionSummary bot={bot} coin={coin} onCloseOpen={onCloseBotPosition} />
+
+      <div className="bot-accordion">
+        <button
+          type="button"
+          className="accordion-toggle"
+          onClick={() => setExpanded(e => !e)}
+          aria-expanded={expanded}
+        >
+          <span className="acc-arrow">{expanded ? '▾' : '▸'}</span>
+          Chart and closed trades
+          <span className="count">
+            ({state.closedTrades.length} closed)
+          </span>
+        </button>
+        {expanded && (
+          <div className="accordion-content">
+            <div className="bot-chart">
+              <div className="bot-chart-head">
+                <div className="label">Live · last {chart ? chart.recent.length : 0} candles</div>
+                <div className="legend">
+                  <span><span className="sw" style={{ background: 'var(--accent)' }}></span>{l1}</span>
+                  <span><span className="sw" style={{ background: '#9aa0a6' }}></span>{l2}</span>
+                  <span><span className="tri-up"></span>Buy</span>
+                  <span><span className="tri-dn"></span>Sell</span>
+                </div>
+              </div>
+              {chart ? (
+                <PriceChart
+                  candles={chart.recent}
+                  lines={chart.lines}
+                  trades={chart.trades}
+                  height={220}
+                  symbol={coin.symbol}
+                />
+              ) : (
+                <div className="bot-chart-empty">
+                  Waiting for first live candles…
+                </div>
+              )}
+            </div>
+
+            <ClosedTradesTable trades={state.closedTrades} symbol={coin.symbol} />
           </div>
         )}
       </div>
-
-      <PositionsTable bot={bot} symbol={coin.symbol} onCloseOpen={onCloseBotPosition} />
 
       {deleting && (
         <DeleteDialog

@@ -106,7 +106,11 @@ export default function Controls({
 
       <div className="ctl-group">
         <div className="group-label">Strategy</div>
-        <div className="ctl-row">
+        <div className="ctl-stack">
+          {S.description && (
+            <div className="strategy-explanation">{S.description}</div>
+          )}
+          <div className="ctl-row">
           <div className="ctl">
             <label htmlFor="strat">
               Strategy <InfoTip>The rule the bot uses to decide when to enter and exit trades. Different rules suit different markets.</InfoTip>
@@ -159,6 +163,7 @@ export default function Controls({
               />
             </div>
           ))}
+          </div>
         </div>
       </div>
 

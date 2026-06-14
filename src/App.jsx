@@ -175,6 +175,133 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Bot config + state persistence -----------------------------------
+  // Saves on every meaningful change: bot list grew/shrank, open
+  // position appeared/disappeared, closedTrades count changed,
+  // running/name toggled. Tick-only updates (lastPrice, lastTickAt)
+  // do NOT trigger a save — they'd flood the DB with no value.
+  const lastBotSnapshot = useRef(new Map())
+
+  const saveBotToDB = async (bot) => {
+    try {
+      await authFetch('/api/bots/save', {
+        method: 'POST',
+        body: JSON.stringify({
+          id: bot.id,
+          name: bot.name,
+          config: bot.config,
+          state: bot.state,
+          running: bot.running,
+        }),
+      })
+    } catch { /* ignore */ }
+  }
+
+  useEffect(() => {
+    if (!supabase) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session || cancelled) return
+
+        const currentIds = new Set()
+        for (const bot of bots) {
+          currentIds.add(bot.id)
+          const prev = lastBotSnapshot.current.get(bot.id)
+          const curr = {
+            name: bot.name,
+            hasOpen: !!bot.state.openPosition,
+            closedCount: bot.state.closedTrades.length,
+            running: bot.running,
+            cash: Math.round(bot.state.cash * 100) / 100,
+          }
+          const significant = !prev ||
+            prev.name !== curr.name ||
+            prev.hasOpen !== curr.hasOpen ||
+            prev.closedCount !== curr.closedCount ||
+            prev.running !== curr.running
+          if (significant) {
+            lastBotSnapshot.current.set(bot.id, curr)
+            saveBotToDB(bot)
+          }
+        }
+
+        for (const id of Array.from(lastBotSnapshot.current.keys())) {
+          if (!currentIds.has(id)) {
+            lastBotSnapshot.current.delete(id)
+          }
+        }
+      } catch { /* ignore */ }
+    })()
+    return () => { cancelled = true }
+  }, [bots])
+
+  // Hydrate bots from DB on auth ready. DB bots merge with localStorage
+  // bots: matched by id, DB version wins. localStorage bots not in DB
+  // get pushed up (so a logged-in user can adopt offline bots).
+  useEffect(() => {
+    if (!supabase) return
+    let cancelled = false
+    const load = async (session) => {
+      if (!session) return
+      try {
+        const r = await authFetch('/api/bots/list')
+        if (!r.ok) return
+        const { bots: dbBots = [] } = await r.json()
+        if (cancelled) return
+
+        const dbMap = new Map(dbBots.map(b => [b.id, b]))
+        setBots(prev => {
+          const localMap = new Map(prev.map(b => [b.id, b]))
+          // Push any local bot not in DB
+          for (const local of prev) {
+            if (!dbMap.has(local.id)) {
+              saveBotToDB(local)
+            }
+          }
+          // Build merged list — DB wins for state/config, but keep
+          // local candles + closedTrades + lastPrice (DB strips them).
+          const merged = []
+          const seenIds = new Set()
+          for (const db of dbBots) {
+            seenIds.add(db.id)
+            const local = localMap.get(db.id)
+            merged.push({
+              id: db.id,
+              name: db.name,
+              createdAt: db.createdAt,
+              running: db.running,
+              config: db.config,
+              state: {
+                ...db.state,
+                closedTrades: local?.state?.closedTrades ?? [],
+                candles: local?.state?.candles,
+                lastPrice: local?.state?.lastPrice ?? db.state?.lastPrice ?? null,
+                lastTickAt: local?.state?.lastTickAt ?? db.state?.lastTickAt ?? null,
+              },
+            })
+            // Mark snapshot so the watcher doesn't immediately re-save
+            lastBotSnapshot.current.set(db.id, {
+              name: db.name,
+              hasOpen: !!db.state?.openPosition,
+              closedCount: local?.state?.closedTrades?.length ?? 0,
+              running: db.running,
+              cash: Math.round((db.state?.cash ?? 0) * 100) / 100,
+            })
+          }
+          for (const local of prev) {
+            if (!seenIds.has(local.id)) merged.push(local)
+          }
+          return merged
+        })
+      } catch { /* ignore */ }
+    }
+    supabase.auth.getSession().then(({ data }) => load(data.session))
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => load(s))
+    return () => { cancelled = true; sub?.subscription?.unsubscribe?.() }
+  }, [])
+
   // Closed-trade persistence ----------------------------------------
   // localStorage is the working copy. On every state change, mirror
   // any new closed trades to Supabase. On auth ready, pull any DB
@@ -346,6 +473,13 @@ export default function App() {
   }
   const handleDeleteBot = (id) => {
     setBots(prev => prev.filter(b => b.id !== id))
+    // Also delete from DB if authenticated. Fire and forget.
+    if (supabase) {
+      authFetch('/api/bots/delete', {
+        method: 'POST',
+        body: JSON.stringify({ id }),
+      }).catch(() => {})
+    }
   }
 
   // Sends a market SELL for the bot's open position. Resolves to the

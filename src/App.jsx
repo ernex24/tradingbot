@@ -24,8 +24,8 @@ export default function App() {
   const [updatedAt, setUpdatedAt] = useState('')
   const [stratKey, setStratKey] = useState('ma')
   const [params, setParams] = useState(() => defaultParams('ma'))
-  const [pair, setPair] = useState('XBTUSD')
-  const [interval, setIntervalState] = useState('1440')
+  const [pair, setPair] = useState('BTC')
+  const [interval, setIntervalState] = useState('1d')
   const [stopPct, setStopPct] = useState(0)
   const [takePct, setTakePct] = useState(0)
   const [stake, setStake] = useState(1000)
@@ -91,40 +91,34 @@ export default function App() {
     setHasta(maxDate)
   }
 
-  const cargarKraken = async (forceInterval, forcePair) => {
+  const cargarOhlc = async (forceInterval, forcePair) => {
     const iv = forceInterval ?? interval
     const pr = forcePair ?? pair
     const co = coinByPair(pr)
     setLoading(true)
     setLoadError('')
     try {
-      const r = await fetch(`/api/kraken?pair=${pr}&interval=${iv}`)
-      if (!r.ok) throw new Error('HTTP ' + r.status)
+      const r = await fetch(`/api/ohlc?coin=${pr}&interval=${iv}`)
       const data = await r.json()
-      if (data.error && data.error.length) {
-        throw new Error(data.error.join(', '))
+      if (!r.ok || data.error) {
+        throw new Error(data.error || ('HTTP ' + r.status))
       }
-      const key = Object.keys(data.result).find(k => k !== 'last')
-      const rows = data.result[key]
-      const intraday = iv !== '1440'
+      const rows = data.candles
+      const intraday = iv !== '1d'
       const next = rows.map(row => {
-        const iso = new Date(+row[0] * 1000).toISOString()
+        const iso = new Date(row.t).toISOString()
         return {
           f: intraday ? iso.slice(0, 16).replace('T', ' ') : iso.slice(0, 10),
-          o: +row[1],
-          h: +row[2],
-          l: +row[3],
-          c: +row[4],
+          o: row.o, h: row.h, l: row.l, c: row.c,
         }
       })
       setCandles(next)
-      const ivLabel = iv === '60' ? '1h' : iv === '240' ? '4h' : '1d'
-      setDataSrc(`live data · Kraken · ${co.symbol} · ${ivLabel}`)
+      setDataSrc(`live · ${data.source} · ${co.symbol} · ${iv} · ${next.length} candles`)
       setUpdatedAt('Updated ' + new Date().toLocaleString('en-US'))
     } catch (e) {
-      console.warn('Kraken fetch failed:', e)
+      console.warn('OHLC fetch failed:', e)
       setLoadError('Could not load live data (' + e.message + '). Using demo.')
-      setDataSrc('Kraken unavailable — using demo')
+      setDataSrc('live source unavailable — using demo')
     } finally {
       setLoading(false)
     }
@@ -132,11 +126,11 @@ export default function App() {
 
   const handleIntervalChange = (iv) => {
     setIntervalState(iv)
-    cargarKraken(iv, pair)
+    cargarOhlc(iv, pair)
   }
   const handlePairChange = (pr) => {
     setPair(pr)
-    cargarKraken(interval, pr)
+    cargarOhlc(interval, pr)
   }
 
   const [l1, l2] = S.leyenda(params)
@@ -184,7 +178,7 @@ export default function App() {
           compound={compound}
           onStakeChange={setStake}
           onCompoundChange={setCompound}
-          onReload={() => cargarKraken()}
+          onReload={() => cargarOhlc()}
           loading={loading}
         />
 

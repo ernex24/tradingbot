@@ -2,9 +2,11 @@ import { STRATS } from '../lib/strategies.js'
 import { COINS } from '../lib/coins.js'
 
 const TIMEFRAMES = [
-  { value: '60', label: '1 hour' },
-  { value: '240', label: '4 hours' },
-  { value: '1440', label: '1 day' },
+  { value: '5m', label: '5 min' },
+  { value: '15m', label: '15 min' },
+  { value: '1h', label: '1 hour' },
+  { value: '4h', label: '4 hours' },
+  { value: '1d', label: '1 day' },
 ]
 
 const STAKE_PRESETS = [100, 1000, 10000]

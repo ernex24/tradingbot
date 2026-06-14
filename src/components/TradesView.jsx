@@ -183,7 +183,7 @@ function BotCard({ bot, onToggle, onDelete }) {
           </div>
           <div className="sub">
             {bot.running
-              ? `polling · last ${ageLabel(state.lastTickAt)}`
+              ? `${config.source === 'binance' ? 'streaming' : 'polling'} · last ${ageLabel(state.lastTickAt)}`
               : 'paused'}
           </div>
         </div>

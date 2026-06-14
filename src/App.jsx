@@ -4,6 +4,7 @@ import { STRATS } from './lib/strategies.js'
 import { backtest } from './lib/backtest.js'
 import { coinByPair, SOURCE_LABELS } from './lib/coins.js'
 import { createInitialState, tick as paperTick } from './lib/paperTrader.js'
+import { binanceStream } from './lib/binanceStream.js'
 import Tabs from './components/Tabs.jsx'
 import Controls from './components/Controls.jsx'
 import KPIs from './components/KPIs.jsx'
@@ -211,69 +212,152 @@ export default function App() {
     setBots(prev => prev.filter(b => b.id !== id))
   }
 
-  // Multi-bot polling ----------------------------------------------
+  // Multi-bot streaming + polling ----------------------------------
 
   const botsRef = useRef(bots)
   useEffect(() => { botsRef.current = bots }, [bots])
 
+  // Stable key per running-bot config so the effect only re-runs on
+  // structural changes (add/remove/pause/reconfig), not on every tick.
+  const subscriptionKey = useMemo(() =>
+    bots
+      .filter(b => b.running)
+      .map(b => [
+        b.id, b.config.pair, b.config.source, b.config.interval,
+        b.config.stratKey, JSON.stringify(b.config.params),
+        b.config.direction, b.config.stopPct, b.config.takePct,
+        b.config.stake, b.config.compound,
+      ].join('|'))
+      .sort()
+      .join('||'),
+    [bots]
+  )
+
   useEffect(() => {
-    let stopped = false
-    const runAllTicks = async () => {
-      const all = botsRef.current
-      const running = all.filter(b => b.running)
-      if (!running.length) return
+    let cancelled = false
+    const disposers = []
+    const lastTick = new Map() // botId → ms of last tick (for throttle)
 
-      const updates = await Promise.all(running.map(async (bot) => {
-        const cfg = bot.config
-        try {
-          const r = await fetch(
-            `/api/ohlc?coin=${cfg.pair}&interval=${cfg.interval}&source=${cfg.source}&_=${Date.now()}`,
-            { cache: 'no-store' }
-          )
-          const data = await r.json()
-          if (!r.ok || data.error) return null
-          const rows = data.candles
-          if (!rows || rows.length < 2) return null
-          const intraday = cfg.interval !== '1d'
-          const liveCandles = rows.map(row => {
-            const iso = new Date(row.t).toISOString()
-            return {
-              f: intraday ? iso.slice(0, 16).replace('T', ' ') : iso.slice(0, 10),
-              o: row.o, h: row.h, l: row.l, c: row.c, t: row.t,
-            }
-          })
-          const Slive = STRATS[cfg.stratKey]
-          const dir = Slive.supportsDirection ? cfg.direction : 'long'
-          const { pos } = Slive.run(liveCandles, cfg.params, dir)
-          const last = liveCandles[liveCandles.length - 1]
-          const signal = pos[pos.length - 1] | 0
-          const next = paperTick(bot.state, signal, last.c, last, Date.now(), {
-            stopPct: cfg.stopPct,
-            takePct: cfg.takePct,
-            compound: cfg.compound,
-            fixedStake: cfg.stake,
-          })
-          return {
-            id: bot.id,
-            state: { ...next, candles: liveCandles.slice(-300) },
-          }
-        } catch (e) {
-          console.warn(`bot ${bot.name} tick failed:`, e)
-          return null
-        }
-      }))
-
-      if (stopped) return
-      setBots(prev => prev.map(b => {
-        const u = updates.find(x => x && x.id === b.id)
-        return u ? { ...b, state: u.state } : b
-      }))
+    const intraday = (iv) => iv !== '1d'
+    const candleFromRest = (row, iv) => {
+      const iso = new Date(row.t).toISOString()
+      return {
+        f: intraday(iv) ? iso.slice(0, 16).replace('T', ' ') : iso.slice(0, 10),
+        o: row.o, h: row.h, l: row.l, c: row.c, t: row.t,
+      }
+    }
+    const candleFromWs = (live, iv) => {
+      const iso = new Date(live.t).toISOString()
+      return {
+        f: intraday(iv) ? iso.slice(0, 16).replace('T', ' ') : iso.slice(0, 10),
+        o: live.o, h: live.h, l: live.l, c: live.c, t: live.t,
+      }
     }
 
-    runAllTicks()
-    const id = setInterval(runAllTicks, POLL_MS)
-    return () => { stopped = true; clearInterval(id) }
-  }, [])
+    const runStrategyAndTick = (botId, candles, signalEvaluation) => {
+      const all = botsRef.current
+      const bot = all.find(b => b.id === botId)
+      if (!bot || !bot.running) return
+      if (candles.length < 2) return
+      const cfg = bot.config
+
+      let signal = bot.state.openPosition?.side ?? 0
+      if (signalEvaluation) {
+        const Slive = STRATS[cfg.stratKey]
+        const dir = Slive.supportsDirection ? cfg.direction : 'long'
+        const { pos } = Slive.run(candles, cfg.params, dir)
+        signal = pos[pos.length - 1] | 0
+      }
+
+      const last = candles[candles.length - 1]
+      const next = paperTick(bot.state, signal, last.c, last, Date.now(), {
+        stopPct: cfg.stopPct,
+        takePct: cfg.takePct,
+        compound: cfg.compound,
+        fixedStake: cfg.stake,
+      })
+      if (cancelled) return
+      setBots(prev => prev.map(b =>
+        b.id === botId
+          ? { ...b, state: { ...next, candles: candles.slice(-300) } }
+          : b
+      ))
+    }
+
+    const backfill = async (bot) => {
+      try {
+        const r = await fetch(
+          `/api/ohlc?coin=${bot.config.pair}&interval=${bot.config.interval}&source=${bot.config.source}&_=${Date.now()}`,
+          { cache: 'no-store' }
+        )
+        const data = await r.json()
+        if (!r.ok || data.error || cancelled) return null
+        return data.candles.map(row => candleFromRest(row, bot.config.interval))
+      } catch { return null }
+    }
+
+    const setupStream = async (bot) => {
+      const initial = await backfill(bot)
+      if (cancelled || !initial) return
+
+      // Seed the candle buffer immediately
+      setBots(prev => prev.map(b =>
+        b.id === bot.id
+          ? { ...b, state: { ...b.state, candles: initial.slice(-300) } }
+          : b
+      ))
+
+      const unsub = binanceStream.subscribe(bot.config.pair, bot.config.interval, (liveCandle) => {
+        if (cancelled) return
+        // Throttle non-close updates to ~500ms; always process candle closes
+        const now = Date.now()
+        const last = lastTick.get(bot.id) || 0
+        if (!liveCandle.closed && now - last < 500) return
+        lastTick.set(bot.id, now)
+
+        const all = botsRef.current
+        const b = all.find(x => x.id === bot.id)
+        if (!b) return
+        const buf = b.state.candles || []
+        const c = candleFromWs(liveCandle, b.config.interval)
+        let nextBuf
+        if (buf.length === 0 || c.t > buf[buf.length - 1].t) {
+          nextBuf = [...buf, c]
+        } else if (c.t === buf[buf.length - 1].t) {
+          nextBuf = [...buf.slice(0, -1), c]
+        } else {
+          return // older candle, ignore
+        }
+        runStrategyAndTick(bot.id, nextBuf, liveCandle.closed)
+      })
+      disposers.push(unsub)
+    }
+
+    const setupPoll = async (bot) => {
+      const run = async () => {
+        if (cancelled) return
+        const initial = await backfill(bot)
+        if (cancelled || !initial) return
+        runStrategyAndTick(bot.id, initial, true)
+      }
+      run()
+      const id = setInterval(run, POLL_MS)
+      disposers.push(() => clearInterval(id))
+    }
+
+    for (const bot of botsRef.current) {
+      if (!bot.running) continue
+      if (bot.config.source === 'binance') setupStream(bot)
+      else setupPoll(bot)
+    }
+
+    return () => {
+      cancelled = true
+      for (const d of disposers) {
+        try { d() } catch {}
+      }
+    }
+  }, [subscriptionKey])
 
   // Render ----------------------------------------------------------
 

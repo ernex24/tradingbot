@@ -474,14 +474,40 @@ export default function AccountView() {
 
   useEffect(() => {
     if (!supabase) { setLoading(false); return }
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session || null)
-      setLoading(false)
-    })
+    let cancelled = false
+
+    // Safety timeout: if getSession somehow hangs (corrupted local
+    // session, refresh stuck, etc.) we still drop into the login form
+    // after 5s rather than leaving the user stuck on "Loading…".
+    const safety = setTimeout(() => {
+      if (!cancelled) setLoading(false)
+    }, 5000)
+
+    supabase.auth.getSession()
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) console.warn('[auth] getSession error:', error)
+        setSession(data?.session || null)
+        setLoading(false)
+        clearTimeout(safety)
+      })
+      .catch(e => {
+        if (cancelled) return
+        console.warn('[auth] getSession threw:', e)
+        setLoading(false)
+        clearTimeout(safety)
+      })
+
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+      if (cancelled) return
       setSession(s || null)
     })
-    return () => sub?.subscription?.unsubscribe?.()
+
+    return () => {
+      cancelled = true
+      clearTimeout(safety)
+      sub?.subscription?.unsubscribe?.()
+    }
   }, [])
 
   const refreshKeys = async () => {

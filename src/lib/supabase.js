@@ -4,6 +4,16 @@ const url = import.meta.env.VITE_SUPABASE_URL
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const supabaseConfigured = !!(url && anonKey)
+
+if (!supabaseConfigured) {
+  // Make a missing env var loud in the browser console instead of
+  // silently producing a null client (which makes Account look broken).
+  console.warn(
+    '[supabase] Missing env vars at build time:',
+    { hasUrl: !!url, hasKey: !!anonKey }
+  )
+}
+
 export const supabase = supabaseConfigured
   ? createClient(url, anonKey, {
       auth: { persistSession: true, autoRefreshToken: true },

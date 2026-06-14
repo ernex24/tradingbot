@@ -57,11 +57,31 @@ header .meta { text-align: right; font-size: 13px; color: var(--mute); }
 
 .controls {
   display: flex;
+  flex-direction: column;
   gap: var(--s4);
-  flex-wrap: wrap;
-  align-items: flex-end;
   padding: var(--s4) 0;
   border-bottom: 1px solid var(--line);
+}
+.ctl-group {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s4);
+}
+.ctl-group .group-label {
+  flex: 0 0 110px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--mute);
+  font-weight: 500;
+  padding-top: 28px;
+}
+.ctl-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s4);
+  flex: 1;
+  align-items: flex-end;
 }
 .ctl { display: flex; flex-direction: column; gap: 6px; }
 .ctl > label {
@@ -266,4 +286,6 @@ footer {
   .svg-price { height: 300px; }
   .svg-equity { height: 190px; }
   select { min-width: 150px; }
+  .ctl-group { flex-direction: column; gap: var(--s2); }
+  .ctl-group .group-label { padding-top: 0; flex: none; }
 }

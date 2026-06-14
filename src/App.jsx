@@ -20,7 +20,7 @@ const datePart = s => (s ? s.slice(0, 10) : '')
 
 export default function App() {
   const [candles, setCandles] = useState(DEMO_CANDLES)
-  const [dataSrc, setDataSrc] = useState('demo data')
+  const [dataSrc, setDataSrc] = useState('loading live data…')
   const [updatedAt, setUpdatedAt] = useState('')
   const [stratKey, setStratKey] = useState('ma')
   const [params, setParams] = useState(() => defaultParams('ma'))
@@ -89,10 +89,6 @@ export default function App() {
     if (which === 'desde') setDesde(value || minDate)
     else setHasta(value || maxDate)
   }
-  const resetRange = () => {
-    setDesde(minDate)
-    setHasta(maxDate)
-  }
 
   const cargarOhlc = async (forceInterval, forcePair) => {
     const iv = forceInterval ?? interval
@@ -136,6 +132,12 @@ export default function App() {
     cargarOhlc(interval, pr)
   }
 
+  // Auto-fetch live data on first mount.
+  useEffect(() => {
+    cargarOhlc()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const [l1, l2] = S.leyenda(params)
   const rango = visibleCandles.length
     ? `${visibleCandles[0].f} – ${visibleCandles[visibleCandles.length - 1].f}`
@@ -172,7 +174,6 @@ export default function App() {
           minDate={minDate}
           maxDate={maxDate}
           onDateChange={handleDateChange}
-          onResetRange={resetRange}
           stopPct={stopPct}
           takePct={takePct}
           onStopChange={setStopPct}
@@ -184,7 +185,6 @@ export default function App() {
           direction={direction}
           directionSupported={S.supportsDirection}
           onDirectionChange={setDirection}
-          onReload={() => cargarOhlc()}
           loading={loading}
         />
 

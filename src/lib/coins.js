@@ -1,18 +1,10 @@
-// Coin keys consumed by /api/ohlc. Each coin declares which exchanges
-// can serve it, and the first one is the default when the coin is selected.
+// Coins available on Binance Spot. All data and execution comes from Binance.
 export const COINS = [
-  { value: 'BTC', label: 'Bitcoin (BTC)', symbol: 'BTC', sources: ['binance', 'kraken'] },
-  { value: 'ETH', label: 'Ethereum (ETH)', symbol: 'ETH', sources: ['binance', 'kraken'] },
-  { value: 'SOL', label: 'Solana (SOL)', symbol: 'SOL', sources: ['binance', 'kraken'] },
-  { value: 'SUI', label: 'Sui (SUI)', symbol: 'SUI', sources: ['binance', 'kraken'] },
-  { value: 'HYPE', label: 'Hyperliquid (HYPE)', symbol: 'HYPE', sources: ['hyperliquid', 'kraken'] },
+  { value: 'BTC', label: 'Bitcoin (BTC)', symbol: 'BTC' },
+  { value: 'ETH', label: 'Ethereum (ETH)', symbol: 'ETH' },
+  { value: 'SOL', label: 'Solana (SOL)', symbol: 'SOL' },
+  { value: 'SUI', label: 'Sui (SUI)', symbol: 'SUI' },
 ]
-
-export const SOURCE_LABELS = {
-  binance: 'Binance',
-  kraken: 'Kraken',
-  hyperliquid: 'Hyperliquid',
-}
 
 export function coinByPair(pair) {
   return COINS.find(c => c.value === pair) || COINS[0]

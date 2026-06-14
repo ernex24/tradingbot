@@ -1,6 +1,6 @@
 import { equity, floatingPnL } from '../lib/paperTrader.js'
 import { price, usdPrecise, signed, pct, qty as fmtQty } from '../lib/format.js'
-import { SOURCE_LABELS, coinByPair } from '../lib/coins.js'
+import { coinByPair } from '../lib/coins.js'
 import { STRATS } from '../lib/strategies.js'
 import PriceChart from './PriceChart.jsx'
 
@@ -34,13 +34,6 @@ function sideTag(side) {
   return <span className="tag tag-long">LONG</span>
 }
 
-function sourceTag(source) {
-  return (
-    <span className={`tag tag-src tag-src-${source}`}>
-      {SOURCE_LABELS[source] || source}
-    </span>
-  )
-}
 
 // Find the latest candle index whose timestamp is <= time.
 function findIdx(candles, time) {
@@ -133,7 +126,7 @@ function BotCard({ bot, onToggle, onDelete }) {
       <div className="bot-head">
         <div>
           <div className="bot-name">
-            {bot.name} {sourceTag(config.source)}{' '}
+            {bot.name}{' '}
             {config.executor === 'binance-testnet'
               ? <span className="tag tag-testnet">LIVE TESTNET</span>
               : <span className="tag tag-open">PAPER</span>}
@@ -191,7 +184,7 @@ function BotCard({ bot, onToggle, onDelete }) {
           </div>
           <div className="sub">
             {bot.running
-              ? `${config.source === 'binance' ? 'streaming' : 'polling'} · last ${ageLabel(state.lastTickAt)}`
+              ? `streaming · last ${ageLabel(state.lastTickAt)}`
               : 'paused'}
           </div>
         </div>
@@ -257,7 +250,6 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot, onCreateBot
       pos: b.state.openPosition,
       live: b.state.lastPrice,
       coin: coinByPair(b.config.pair),
-      source: b.config.source,
     }))
 
   const closedRows = bots.flatMap(b =>
@@ -266,7 +258,6 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot, onCreateBot
       botName: b.name,
       botId: b.id,
       symbol: coinByPair(b.config.pair).symbol,
-      source: b.config.source,
       tradeIdx: i + 1,
     }))
   ).sort((a, b) => (b.exitTime || 0) - (a.exitTime || 0))
@@ -316,7 +307,7 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot, onCreateBot
             <table>
               <thead>
                 <tr>
-                  <th>Bot · Market</th>
+                  <th>Bot</th>
                   <th>Side</th>
                   <th>Bought</th>
                   <th>Live</th>
@@ -324,15 +315,14 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot, onCreateBot
                 </tr>
               </thead>
               <tbody>
-                {openRows.map(({ bot, pos, live, coin, source }) => {
+                {openRows.map(({ bot, pos, live, coin }) => {
                   const fp = live ? floatingPnL(pos, live) : 0
                   return (
                     <tr key={bot.id}>
                       <td>
                         {bot.name}
-                        <div style={{ marginTop: 2 }}>
-                          {sourceTag(source)}{' '}
-                          <span style={{ color: 'var(--mute)', fontSize: 11 }}>· {coin.symbol}</span>
+                        <div style={{ color: 'var(--mute)', fontSize: 11, marginTop: 2 }}>
+                          {coin.symbol}
                         </div>
                       </td>
                       <td>{sideTag(pos.side)}</td>
@@ -371,11 +361,12 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot, onCreateBot
             <table>
               <thead>
                 <tr>
-                  <th>Bot · Market</th>
+                  <th>Bot</th>
                   <th>Side</th>
                   <th>Bought</th>
                   <th>Sold</th>
                   <th className="r">Result (net)</th>
+                  <th className="r">Fees</th>
                   <th className="r">P&amp;L</th>
                 </tr>
               </thead>
@@ -386,9 +377,8 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot, onCreateBot
                     <tr key={`${t.botId}-${t.exitTime}-${t.entryTime}`}>
                       <td>
                         {t.botName}
-                        <div style={{ marginTop: 2 }}>
-                          {sourceTag(t.source)}{' '}
-                          <span style={{ color: 'var(--mute)', fontSize: 11 }}>· {t.symbol}</span>
+                        <div style={{ color: 'var(--mute)', fontSize: 11, marginTop: 2 }}>
+                          {t.symbol}
                         </div>
                       </td>
                       <td>{sideTag(t.side)}</td>
@@ -402,6 +392,9 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot, onCreateBot
                         {timestamp(t.exitTime)} · {price(t.exitPrice)} {reasonTag(t.reason)}
                       </td>
                       <td className={`r num ${cls}`}>{pct(t.netPct)}</td>
+                      <td className="r num" style={{ color: 'var(--mute)' }}>
+                        {usdPrecise(t.feeUSD ?? 0)}
+                      </td>
                       <td className={`r num ${cls}`}>
                         {signed(t.pnlUSD)}
                         <div style={{ color: 'var(--mute)', fontSize: 11, fontWeight: 400 }}>

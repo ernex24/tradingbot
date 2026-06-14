@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { DEMO_CANDLES } from './lib/demoData.js'
 import { STRATS } from './lib/strategies.js'
 import { backtest } from './lib/backtest.js'
-import { coinByPair, SOURCE_LABELS } from './lib/coins.js'
+import { coinByPair } from './lib/coins.js'
 import { createInitialState, tick as paperTick } from './lib/paperTrader.js'
 import { executeTick as binanceTick, executorSupportsCoin } from './lib/binanceExecutor.js'
 import { binanceStream } from './lib/binanceStream.js'
@@ -55,7 +55,6 @@ export default function App() {
   const [stratKey, setStratKey] = useState('ma')
   const [params, setParams] = useState(() => defaultParams('ma'))
   const [pair, setPair] = useState('BTC')
-  const [source, setSource] = useState('binance')
   const [interval, setIntervalState] = useState('1d')
   const [stopPct, setStopPct] = useState(0)
   const [takePct, setTakePct] = useState(0)
@@ -124,15 +123,14 @@ export default function App() {
     else setHasta(value || maxDate)
   }
 
-  const cargarOhlc = async (forceInterval, forcePair, forceSource) => {
+  const cargarOhlc = async (forceInterval, forcePair) => {
     const iv = forceInterval ?? interval
     const pr = forcePair ?? pair
-    const src = forceSource ?? source
     const co = coinByPair(pr)
     setLoading(true)
     setLoadError('')
     try {
-      const r = await fetch(`/api/ohlc?coin=${pr}&interval=${iv}&source=${src}`)
+      const r = await fetch(`/api/ohlc?coin=${pr}&interval=${iv}`)
       const data = await r.json()
       if (!r.ok || data.error) {
         throw new Error(data.error || ('HTTP ' + r.status))
@@ -147,7 +145,7 @@ export default function App() {
         }
       })
       setCandles(next)
-      setDataSrc(`live · ${data.source} · ${co.symbol} · ${iv} · ${next.length} candles`)
+      setDataSrc(`live · Binance · ${co.symbol} · ${iv} · ${next.length} candles`)
       setUpdatedAt('Updated ' + new Date().toLocaleString('en-US'))
     } catch (e) {
       console.warn('OHLC fetch failed:', e)
@@ -160,18 +158,11 @@ export default function App() {
 
   const handleIntervalChange = (iv) => {
     setIntervalState(iv)
-    cargarOhlc(iv, pair, source)
+    cargarOhlc(iv, pair)
   }
   const handlePairChange = (pr) => {
-    const co = coinByPair(pr)
-    const newSource = co.sources.includes(source) ? source : co.sources[0]
     setPair(pr)
-    setSource(newSource)
-    cargarOhlc(interval, pr, newSource)
-  }
-  const handleSourceChange = (src) => {
-    setSource(src)
-    cargarOhlc(interval, pair, src)
+    cargarOhlc(interval, pr)
   }
 
   useEffect(() => {
@@ -194,7 +185,7 @@ export default function App() {
       createdAt: Date.now(),
       running: true,
       config: {
-        pair, source, interval,
+        pair, source: 'binance', interval,
         stratKey,
         params: { ...params },
         direction,
@@ -308,7 +299,7 @@ export default function App() {
     const backfill = async (bot) => {
       try {
         const r = await fetch(
-          `/api/ohlc?coin=${bot.config.pair}&interval=${bot.config.interval}&source=${bot.config.source}&_=${Date.now()}`,
+          `/api/ohlc?coin=${bot.config.pair}&interval=${bot.config.interval}&_=${Date.now()}`,
           { cache: 'no-store' }
         )
         const data = await r.json()
@@ -415,8 +406,6 @@ export default function App() {
               onParamChange={handleParamChange}
               pair={pair}
               onPairChange={handlePairChange}
-              source={source}
-              onSourceChange={handleSourceChange}
               interval={interval}
               onIntervalChange={handleIntervalChange}
               desde={desde}
@@ -502,7 +491,7 @@ export default function App() {
             <section className="chartblock">
               <div className="chead">
                 <div className="label">
-                  Your money over time · ${stake.toLocaleString('en-US')} invested
+                  Your money over time · {stake.toLocaleString('en-US')} USDT invested
                   {!compound && <span style={{ color: 'var(--mute)', fontWeight: 400 }}> · fixed size per trade</span>}
                 </div>
                 <div className="legend">

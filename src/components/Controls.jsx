@@ -1,5 +1,5 @@
 import { STRATS } from '../lib/strategies.js'
-import { COINS, SOURCE_LABELS, coinByPair } from '../lib/coins.js'
+import { COINS } from '../lib/coins.js'
 import InfoTip from './InfoTip.jsx'
 
 const TIMEFRAMES = [
@@ -28,7 +28,6 @@ const PARAM_TIPS = {
 export default function Controls({
   stratKey, params, onStratChange, onParamChange,
   pair, onPairChange,
-  source, onSourceChange,
   interval, onIntervalChange,
   desde, hasta, minDate, maxDate, onDateChange,
   stopPct, takePct, onStopChange, onTakeChange,
@@ -37,8 +36,6 @@ export default function Controls({
   loading,
 }) {
   const S = STRATS[stratKey]
-  const coin = coinByPair(pair)
-  const availableSources = coin.sources
 
   return (
     <section className="controls">
@@ -57,23 +54,6 @@ export default function Controls({
             >
               {COINS.map(c => (
                 <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="ctl">
-            <label htmlFor="src">
-              Data source <InfoTip>Which exchange's prices to use. Binance has more history and tighter spreads. Kraken matches what you'd actually trade if your account is there. Hyperliquid is the only source for HYPE.</InfoTip>
-            </label>
-            <select
-              id="src"
-              value={source}
-              onChange={e => onSourceChange(e.target.value)}
-              disabled={loading || availableSources.length < 2}
-              title={availableSources.length < 2 ? 'Only one exchange available for this coin.' : ''}
-            >
-              {availableSources.map(s => (
-                <option key={s} value={s}>{SOURCE_LABELS[s]}</option>
               ))}
             </select>
           </div>
@@ -187,7 +167,7 @@ export default function Controls({
         <div className="ctl-row">
           <div className="ctl">
             <label htmlFor="amount">
-              Amount ($) <InfoTip>Starting capital in dollars. The bot simulates as if you began with this much in your account.</InfoTip>
+              Amount (USDT) <InfoTip>Starting capital in USDT. The bot simulates (or trades real on Testnet) as if you began with this much USDT in your account.</InfoTip>
             </label>
             <input
               id="amount"

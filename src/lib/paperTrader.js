@@ -63,6 +63,7 @@ export function closePosition(state, exitPrice, currentTime, reason) {
   const grossPct = op.side * (exitPrice - op.entryPrice) / op.entryPrice * 100
   const netPct = grossPct - 2 * COM * 100
   const pnlUSD = op.invested * (op.side * (exitPrice - op.entryPrice) / op.entryPrice - 2 * COM)
+  const feeUSD = op.invested * COM * 2
   return {
     ...state,
     cash: state.cash + proceeds,
@@ -75,7 +76,7 @@ export function closePosition(state, exitPrice, currentTime, reason) {
       exitTime: currentTime,
       invested: op.invested,
       qty: op.qty,
-      grossPct, netPct, pnlUSD,
+      grossPct, netPct, pnlUSD, feeUSD,
       reason,
     }],
   }

@@ -126,10 +126,10 @@ export default function TradeTable({ trades, symbol = 'BTC' }) {
       <div className="tnote">
         <b>LONG</b> = bought to open, sold to close (wins when price rises).{' '}
         <b>SHORT</b> = sold to open, bought to close (wins when price falls).
-        Size = {symbol} traded and dollars committed at entry. With <b>compounding on</b>,
+        Size = {symbol} traded and USDT committed at entry. With <b>compounding on</b>,
         position size grows or shrinks with previous results; with <b>fixed size</b>, every trade
         uses the same amount. <b>Fees</b> = 0.16% × committed × sides (2 = entry+exit, 1 = still-open).
-        <b>P&amp;L</b> is the real dollar gain or loss for each trade, already net of fees.
+        <b>P&amp;L</b> is the real USDT gain or loss for each trade, already net of fees.
         Sold labels: <b>SL</b> = stop loss hit, <b>TP</b> = take profit hit, no tag = strategy signal.
       </div>
     </section>

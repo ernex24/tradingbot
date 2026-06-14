@@ -57,8 +57,13 @@ function applyExit(state, exitPriceFallback, currentTime, reason, order) {
   if (!op) return state
   const proceeds = order.cummulativeQuoteQty
   const exitPrice = order.avgPrice ?? (proceeds / order.executedQty) ?? exitPriceFallback
-  const grossPct = op.side * (exitPrice - op.entryPrice) / op.entryPrice * 100
+  // Gross PnL = what the price move alone would have produced.
+  // Real proceeds are already net of Binance fees, so:
+  //   feeUSD = gross_pnl - net_pnl
+  const grossPnL = op.invested * op.side * (exitPrice - op.entryPrice) / op.entryPrice
   const pnlUSD = proceeds - op.invested
+  const feeUSD = Math.max(0, grossPnL - pnlUSD)
+  const grossPct = op.side * (exitPrice - op.entryPrice) / op.entryPrice * 100
   const netPct = (pnlUSD / op.invested) * 100
   return {
     ...state,
@@ -72,7 +77,7 @@ function applyExit(state, exitPriceFallback, currentTime, reason, order) {
       exitTime: currentTime,
       invested: op.invested,
       qty: op.qty,
-      grossPct, netPct, pnlUSD,
+      grossPct, netPct, pnlUSD, feeUSD,
       reason,
       entryOrderId: op.entryOrderId,
       exitOrderId: order.orderId,

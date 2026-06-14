@@ -1,12 +1,11 @@
 // POST /api/keys/save
-// Body: { exchange, testnet, apiKey, apiSecret, permissions: string[] }
+// Body: { exchange: 'binance', testnet, apiKey, apiSecret, permissions }
 // Requires Authorization: Bearer <Supabase JWT>.
-// Validates the key by hitting the exchange's account endpoint before
-// storing. Encrypts both fields with AES-256-GCM, upserts into
-// user_exchange_keys keyed by (user_id, exchange, testnet).
+// Validates by hitting Binance /api/v3/account before storing.
+// Encrypts both fields with AES-256-GCM, upserts keyed by
+// (user_id, exchange, testnet).
 
 import { encrypt } from '../_lib/encryption.js'
-import { krakenPrivate } from '../_lib/krakenSign.js'
 import { binanceSigned } from '../_lib/binanceSign.js'
 import { getAdminClient, requireUser, jsonResponse } from '../_lib/supabaseServer.js'
 
@@ -23,26 +22,21 @@ export default async function handler(req, res) {
   if (!exchange || !apiKey || !apiSecret) {
     return jsonResponse(res, 400, { error: 'missing exchange, apiKey or apiSecret' })
   }
-  if (!['kraken', 'binance'].includes(exchange)) {
-    return jsonResponse(res, 400, { error: 'unsupported exchange' })
+  if (exchange !== 'binance') {
+    return jsonResponse(res, 400, { error: 'only Binance is supported' })
   }
   const isTestnet = !!testnet
 
   const trimmedKey = apiKey.trim()
   const trimmedSecret = apiSecret.trim()
 
-  // Validate the key by making a real authenticated call before storing.
   try {
-    if (exchange === 'kraken') {
-      await krakenPrivate(trimmedKey, trimmedSecret, 'Balance')
-    } else if (exchange === 'binance') {
-      await binanceSigned({
-        apiKey: trimmedKey,
-        apiSecret: trimmedSecret,
-        testnet: isTestnet,
-        path: '/api/v3/account',
-      })
-    }
+    await binanceSigned({
+      apiKey: trimmedKey,
+      apiSecret: trimmedSecret,
+      testnet: isTestnet,
+      path: '/api/v3/account',
+    })
   } catch (e) {
     return jsonResponse(res, 400, { error: 'key validation failed: ' + e.message })
   }

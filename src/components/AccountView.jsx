@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import { supabase, supabaseConfigured, authFetch } from '../lib/supabase.js'
 import InfoTip from './InfoTip.jsx'
 
-const KRAKEN_READ_PERMS = ['Query Funds', 'Query Open Orders & Trades', 'Query Closed Orders & Trades']
-
 function LoginPanel({ onSession }) {
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
@@ -428,66 +426,6 @@ function OrderPanel({ testnet, onAfterFill }) {
   )
 }
 
-function KrakenKeyForm({ onSaved }) {
-  const [apiKey, setApiKey] = useState('')
-  const [apiSecret, setApiSecret] = useState('')
-  const [confirmed, setConfirmed] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-
-  const submit = async (e) => {
-    e.preventDefault()
-    setErr(''); setBusy(true)
-    try {
-      const r = await authFetch('/api/keys/save', {
-        method: 'POST',
-        body: JSON.stringify({
-          exchange: 'kraken',
-          testnet: false,
-          apiKey, apiSecret,
-          permissions: KRAKEN_READ_PERMS,
-        }),
-      })
-      const data = await r.json()
-      if (!r.ok) throw new Error(data.error || 'failed to save')
-      onSaved(data)
-      setApiKey(''); setApiSecret('')
-    } catch (e) {
-      setErr(e.message || String(e))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <form onSubmit={submit} className="key-form">
-      <div className="key-warn">
-        <b>Kraken is real money.</b> Your key must have <b>only these three permissions</b>:
-        <ul>
-          {KRAKEN_READ_PERMS.map(p => <li key={p}>{p}</li>)}
-        </ul>
-        <b>Never enable Withdraw Funds.</b> We validate by making a real Balance call before saving.
-      </div>
-      <label>
-        API Key
-        <input type="text" value={apiKey} onChange={e => setApiKey(e.target.value)} autoComplete="off" required />
-      </label>
-      <label>
-        API Secret
-        <input type="password" value={apiSecret} onChange={e => setApiSecret(e.target.value)} autoComplete="off" required />
-      </label>
-      <label className="toggle">
-        <input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />
-        <span>I confirm this key has ONLY the three read-only permissions listed above.</span>
-      </label>
-      <button type="submit" className="btn" disabled={busy || !confirmed}>
-        {busy ? 'Validating with Kraken…' : 'Connect Kraken'}
-      </button>
-      {err && <div className="warn" style={{ marginTop: 12 }}>{err}</div>}
-    </form>
-  )
-}
-
 function ConnectedHeader({ keyInfo, label, badgeText, badgeClass, onDisconnect }) {
   const [busy, setBusy] = useState(false)
   const disconnect = async () => {
@@ -585,7 +523,6 @@ export default function AccountView() {
   }
 
   const binanceTestnetKey = (keys || []).find(k => k.exchange === 'binance' && k.testnet)
-  const krakenKey = (keys || []).find(k => k.exchange === 'kraken')
 
   return (
     <div className="account-view">
@@ -631,26 +568,6 @@ export default function AccountView() {
         )}
       </div>
 
-      {/* Kraken — real money, read-only */}
-      <div className="exchange-block">
-        <div className="exchange-head">
-          <div style={{ fontSize: 15, fontWeight: 600 }}>Kraken</div>
-          <span className="tag tag-real">REAL · read-only</span>
-        </div>
-        {keys === null ? (
-          <div style={{ color: 'var(--mute)' }}>Loading…</div>
-        ) : krakenKey ? (
-          <ConnectedHeader
-            keyInfo={krakenKey}
-            label="Kraken"
-            badgeText="REAL"
-            badgeClass="tag-real"
-            onDisconnect={refreshKeys}
-          />
-        ) : (
-          <KrakenKeyForm onSaved={() => refreshKeys()} />
-        )}
-      </div>
     </div>
   )
 }

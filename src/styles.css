@@ -413,6 +413,26 @@ input[type=date] {
 }
 .bot-trades-scroll td.pos { color: var(--pos); font-weight: 600; }
 .bot-trades-scroll td.neg { color: var(--neg); font-weight: 600; }
+.bot-trades-scroll .row-open {
+  background: #e8f3ec;
+}
+.bot-trades-scroll .row-open td {
+  border-bottom: 1px solid #c0e0cc;
+}
+.tag-open-pos {
+  background: var(--pos);
+  color: #fff;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.tag-closed {
+  background: #eef1f4;
+  color: var(--mute);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
 
 .totals-card {
   margin-top: var(--s5);

@@ -2,6 +2,7 @@ import { equity, floatingPnL } from '../lib/paperTrader.js'
 import { price, usdPrecise, signed, pct, qty as fmtQty } from '../lib/format.js'
 import { coinByPair } from '../lib/coins.js'
 import { STRATS } from '../lib/strategies.js'
+import { COM } from '../lib/backtest.js'
 import PriceChart from './PriceChart.jsx'
 
 const CHART_VISIBLE = 150
@@ -107,52 +108,118 @@ function buildChartData(bot) {
   return { recent, lines, trades }
 }
 
-function ClosedTradesTable({ trades, symbol }) {
-  if (!trades.length) return null
-  const rows = [...trades].reverse()
+function PositionsTable({ bot, symbol }) {
+  const { state } = bot
+  const op = state.openPosition
+  const closed = state.closedTrades
+
+  if (!op && !closed.length) return null
+
+  const rows = []
+  if (op) {
+    const live = state.lastPrice
+    const fp = live ? floatingPnL(op, live) : 0
+    const floatPct = op.invested > 0 ? (fp / op.invested) * 100 : 0
+    rows.push({
+      key: 'open',
+      open: true,
+      side: op.side,
+      entryTime: op.entryTime,
+      entryPrice: op.entryPrice,
+      qty: op.qty,
+      invested: op.invested,
+      exitPrice: live,
+      exitTime: null,
+      reason: 'open',
+      slPrice: op.slPrice,
+      tpPrice: op.tpPrice,
+      pct: floatPct,
+      fee: op.invested * COM,
+      pnl: fp,
+    })
+  }
+  closed.slice().reverse().forEach((t, i) => {
+    rows.push({
+      key: `${t.exitTime}-${t.entryTime}`,
+      open: false,
+      idx: closed.length - i,
+      side: t.side,
+      entryTime: t.entryTime,
+      entryPrice: t.entryPrice,
+      qty: t.qty,
+      invested: t.invested,
+      exitPrice: t.exitPrice,
+      exitTime: t.exitTime,
+      reason: t.reason,
+      pct: t.netPct,
+      fee: t.feeUSD ?? 0,
+      pnl: t.pnlUSD,
+    })
+  })
+
   return (
     <div className="bot-trades">
       <div className="label" style={{ marginBottom: 'var(--s2)' }}>
-        Closed trades ({trades.length})
+        Positions ({closed.length} closed{op ? ' · 1 open' : ''})
       </div>
       <div className="bot-trades-scroll">
         <table>
           <thead>
             <tr>
               <th>#</th>
+              <th>Status</th>
               <th>Side</th>
               <th>Bought</th>
-              <th>Sold</th>
-              <th className="r">Result (net)</th>
+              <th>Sold / Live</th>
+              <th className="r">Result</th>
               <th className="r">Fees</th>
               <th className="r">P&amp;L</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((t, i) => {
-              const idx = trades.length - i
-              const cls = t.netPct >= 0 ? 'pos' : 'neg'
+            {rows.map(r => {
+              const cls = r.pnl >= 0 ? 'pos' : 'neg'
               return (
-                <tr key={`${t.exitTime}-${t.entryTime}`}>
-                  <td className="num">{idx}</td>
-                  <td>{sideTag(t.side)}</td>
+                <tr key={r.key} className={r.open ? 'row-open' : ''}>
+                  <td className="num">{r.open ? '—' : r.idx}</td>
+                  <td>
+                    {r.open
+                      ? <span className="tag tag-open-pos">OPEN</span>
+                      : <span className="tag tag-closed">CLOSED</span>}
+                  </td>
+                  <td>{sideTag(r.side)}</td>
                   <td className="num">
-                    {timestamp(t.entryTime)} · {price(t.entryPrice)}
+                    {timestamp(r.entryTime)} · {price(r.entryPrice)}
                     <div style={{ color: 'var(--mute)', fontSize: 11 }}>
-                      {fmtQty(t.qty, symbol)} for {usdPrecise(t.invested)}
+                      {fmtQty(r.qty, symbol)} for {usdPrecise(r.invested)}
                     </div>
                   </td>
                   <td className="num">
-                    {timestamp(t.exitTime)} · {price(t.exitPrice)} {reasonTag(t.reason)}
+                    {r.open ? (
+                      <>
+                        live {r.exitPrice ? price(r.exitPrice) : '—'}
+                        <div style={{ color: 'var(--mute)', fontSize: 11 }}>
+                          SL {r.slPrice ? price(r.slPrice) : 'off'} ·
+                          {' '}TP {r.tpPrice ? price(r.tpPrice) : 'off'}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {timestamp(r.exitTime)} · {price(r.exitPrice)} {reasonTag(r.reason)}
+                      </>
+                    )}
                   </td>
-                  <td className={`r num ${cls}`}>{pct(t.netPct)}</td>
+                  <td className={`r num ${cls}`}>{pct(r.pct)}</td>
                   <td className="r num" style={{ color: 'var(--mute)' }}>
-                    {usdPrecise(t.feeUSD ?? 0)}
+                    {usdPrecise(r.fee)}
+                    {r.open && (
+                      <div style={{ fontSize: 11 }}>1 side</div>
+                    )}
                   </td>
                   <td className={`r num ${cls}`}>
-                    {signed(t.pnlUSD)}
+                    {signed(r.pnl)}
                     <div style={{ color: 'var(--mute)', fontSize: 11, fontWeight: 400 }}>
-                      → {usdPrecise(t.invested + t.pnlUSD)}
+                      → {usdPrecise(r.invested + r.pnl)}
                     </div>
                   </td>
                 </tr>
@@ -243,31 +310,6 @@ function BotCard({ bot, onToggle, onDelete }) {
         </div>
       </div>
 
-      {op && (
-        <div className="bot-open">
-          <div className="label" style={{ marginBottom: 'var(--s2)' }}>Open position</div>
-          {sideTag(op.side)} {fmtQty(op.qty, coin.symbol)} · entry {price(op.entryPrice)}{' '}
-          <span style={{ color: 'var(--mute)' }}>· {timestamp(op.entryTime)}</span>
-          {state.lastPrice && (() => {
-            const fp = floatingPnL(op, state.lastPrice)
-            const total = op.invested + fp
-            return (
-              <>
-                {' '}· live {price(state.lastPrice)}{' '}
-                <span className={fp >= 0 ? 'pos' : 'neg'}>
-                  ({signed(fp)} → {usdPrecise(total)})
-                </span>
-              </>
-            )
-          })()}
-          <div className="bot-open-sl">
-            SL: {op.slPrice ? price(op.slPrice) : 'off'} ·
-            {' '}TP: {op.tpPrice ? price(op.tpPrice) : 'off'} ·
-            {' '}invested {usdPrecise(op.invested)}
-          </div>
-        </div>
-      )}
-
       <div className="bot-chart">
         <div className="bot-chart-head">
           <div className="label">Live · last {chart ? chart.recent.length : 0} candles</div>
@@ -293,7 +335,7 @@ function BotCard({ bot, onToggle, onDelete }) {
         )}
       </div>
 
-      <ClosedTradesTable trades={state.closedTrades} symbol={coin.symbol} />
+      <PositionsTable bot={bot} symbol={coin.symbol} />
     </div>
   )
 }

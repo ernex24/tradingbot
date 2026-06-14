@@ -209,6 +209,79 @@ input[type=date] {
 .tag-long { background: #e8f0fb; color: var(--accent); }
 .tag-short { background: #fde9e0; color: #b8531a; }
 
+.paperblock {
+  padding: var(--s5) 0 var(--s6);
+  border-top: 1px solid var(--ink);
+  margin-top: var(--s5);
+}
+.paper-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--s3);
+}
+.paper-tracking {
+  font-size: 13px;
+  color: var(--mute);
+  margin-top: 4px;
+}
+.paper-empty {
+  font-size: 13px;
+  color: var(--mute);
+  padding: var(--s3) 0 0;
+  max-width: 560px;
+  line-height: 1.5;
+}
+.paper-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s5);
+  padding: var(--s4) 0;
+  border-bottom: 1px solid var(--line);
+}
+.pstat .num { font-size: 18px; margin-top: 4px; font-weight: 500; }
+.pstat .num.num-md { font-size: 22px; font-weight: 600; }
+.pstat .num.pos { color: var(--pos); }
+.pstat .num.neg { color: var(--neg); }
+.pstat .sub { font-size: 12px; color: var(--mute); margin-top: 4px; }
+.pstat .sub .pos { color: var(--pos); }
+.pstat .sub .neg { color: var(--neg); }
+
+.paper-open {
+  padding: var(--s3) 0;
+  border-bottom: 1px solid var(--line);
+}
+.paper-open-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s3);
+  font-size: 14px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.paper-open-row .pos { color: var(--pos); }
+.paper-open-row .neg { color: var(--neg); }
+.paper-open-sl {
+  font-size: 12px;
+  color: var(--mute);
+  margin-top: 4px;
+}
+
+.paper-history { padding: var(--s4) 0; }
+.paper-history table { font-size: 13px; }
+.paper-history th { padding-bottom: var(--s2); }
+.paper-history td { padding: var(--s2) var(--s2) var(--s2) 0; }
+.paper-history td.pos { color: var(--pos); font-weight: 600; }
+.paper-history td.neg { color: var(--neg); font-weight: 600; }
+
+.paper-reset {
+  margin-top: var(--s3);
+}
+
+@media (max-width: 760px) {
+  .paper-stats { grid-template-columns: 1fr; gap: var(--s3); }
+}
+
 .info {
   position: relative;
   display: inline-block;

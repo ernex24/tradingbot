@@ -1,13 +1,31 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { DEMO_CANDLES } from './lib/demoData.js'
 import { STRATS } from './lib/strategies.js'
 import { backtest } from './lib/backtest.js'
-import { coinByPair } from './lib/coins.js'
+import { coinByPair, SOURCE_LABELS } from './lib/coins.js'
+import { createInitialState, tick as paperTick } from './lib/paperTrader.js'
 import Controls from './components/Controls.jsx'
 import KPIs from './components/KPIs.jsx'
 import PriceChart from './components/PriceChart.jsx'
 import EquityChart from './components/EquityChart.jsx'
 import TradeTable from './components/TradeTable.jsx'
+import PaperPanel from './components/PaperPanel.jsx'
+
+const PAPER_STORAGE_KEY = 'paperTrader.v1'
+const PAPER_POLL_MS = 30000
+
+function loadPaperState() {
+  try {
+    const raw = localStorage.getItem(PAPER_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
+function savePaperState(state) {
+  try {
+    if (state) localStorage.setItem(PAPER_STORAGE_KEY, JSON.stringify(state))
+    else localStorage.removeItem(PAPER_STORAGE_KEY)
+  } catch {}
+}
 
 function defaultParams(stratKey) {
   const out = {}
@@ -34,6 +52,10 @@ export default function App() {
   const [direction, setDirection] = useState('long')
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
+
+  const [paperEnabled, setPaperEnabled] = useState(false)
+  const [paperState, setPaperState] = useState(() => loadPaperState())
+  const [paperPrice, setPaperPrice] = useState(null)
 
   const coin = coinByPair(pair)
 
@@ -147,6 +169,84 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Refs so the polling closure always sees the latest state/config.
+  const paperStateRef = useRef(paperState)
+  useEffect(() => { paperStateRef.current = paperState }, [paperState])
+  const paperCfgRef = useRef(null)
+  paperCfgRef.current = {
+    pair, source, interval, stratKey, params, direction,
+    stopPct, takePct, stake, compound,
+    effectiveDirection,
+  }
+
+  const handlePaperToggle = (on) => {
+    if (on && !paperState) {
+      const fresh = createInitialState(stake)
+      setPaperState(fresh)
+      savePaperState(fresh)
+    }
+    setPaperEnabled(on)
+  }
+  const handlePaperReset = () => {
+    setPaperEnabled(false)
+    setPaperState(null)
+    setPaperPrice(null)
+    savePaperState(null)
+  }
+
+  // Polling loop while paper trading is on.
+  useEffect(() => {
+    if (!paperEnabled) return
+    let stopped = false
+
+    const runTick = async () => {
+      const cfg = paperCfgRef.current
+      try {
+        const r = await fetch(
+          `/api/ohlc?coin=${cfg.pair}&interval=${cfg.interval}&source=${cfg.source}&_=${Date.now()}`,
+          { cache: 'no-store' }
+        )
+        const data = await r.json()
+        if (!r.ok || data.error) return
+        const rows = data.candles
+        if (!rows || rows.length < 2) return
+        const intraday = cfg.interval !== '1d'
+        const liveCandles = rows.map(row => {
+          const iso = new Date(row.t).toISOString()
+          return {
+            f: intraday ? iso.slice(0, 16).replace('T', ' ') : iso.slice(0, 10),
+            o: row.o, h: row.h, l: row.l, c: row.c, t: row.t,
+          }
+        })
+        const Slive = STRATS[cfg.stratKey]
+        const dir = Slive.supportsDirection ? cfg.direction : 'long'
+        const { pos } = Slive.run(liveCandles, cfg.params, dir)
+        const last = liveCandles[liveCandles.length - 1]
+        const signal = pos[pos.length - 1] | 0
+        const currentPrice = last.c
+
+        const prev = paperStateRef.current
+        if (!prev) return
+        const next = paperTick(prev, signal, currentPrice, last, Date.now(), {
+          stopPct: cfg.stopPct,
+          takePct: cfg.takePct,
+          compound: cfg.compound,
+          fixedStake: cfg.stake,
+        })
+        if (stopped) return
+        setPaperState(next)
+        savePaperState(next)
+        setPaperPrice(currentPrice)
+      } catch (e) {
+        console.warn('paper tick failed:', e)
+      }
+    }
+
+    runTick()
+    const id = setInterval(runTick, PAPER_POLL_MS)
+    return () => { stopped = true; clearInterval(id) }
+  }, [paperEnabled])
+
   const [l1, l2] = S.leyenda(params)
   const rango = visibleCandles.length
     ? `${visibleCandles[0].f} – ${visibleCandles[visibleCandles.length - 1].f}`
@@ -246,6 +346,19 @@ export default function App() {
         </section>
 
         {result && <TradeTable trades={result.trades} symbol={coin.symbol} />}
+
+        <PaperPanel
+          enabled={paperEnabled}
+          state={paperState}
+          currentPrice={paperPrice}
+          symbol={coin.symbol}
+          coinLabel={`${coin.symbol} (${SOURCE_LABELS[source]})`}
+          intervalLabel={interval}
+          stratLabel={S.nombre}
+          dirLabel={effectiveDirection}
+          onToggle={handlePaperToggle}
+          onReset={handlePaperReset}
+        />
 
         <footer>
           Research tool, not financial advice. Demo figures do not predict future performance.

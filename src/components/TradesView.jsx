@@ -133,7 +133,10 @@ function BotCard({ bot, onToggle, onDelete }) {
       <div className="bot-head">
         <div>
           <div className="bot-name">
-            {bot.name} {sourceTag(config.source)}
+            {bot.name} {sourceTag(config.source)}{' '}
+            {config.executor === 'binance-testnet'
+              ? <span className="tag tag-testnet">LIVE TESTNET</span>
+              : <span className="tag tag-open">PAPER</span>}
           </div>
           <div className="bot-meta">
             {coin.symbol} · {config.interval} · {S.nombre} · {config.effectiveDirection}
@@ -141,6 +144,11 @@ function BotCard({ bot, onToggle, onDelete }) {
             {config.takePct > 0 && ` · TP ${config.takePct}%`}
             {' · '}{config.compound ? 'compounding' : 'fixed size'}
           </div>
+          {state.lastError && (
+            <div style={{ color: 'var(--neg)', fontSize: 12, marginTop: 4 }}>
+              ⚠ Last tick error: {state.lastError}
+            </div>
+          )}
         </div>
         <div className="bot-actions">
           <button

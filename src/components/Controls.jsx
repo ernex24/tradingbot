@@ -1,5 +1,6 @@
 import { STRATS } from '../lib/strategies.js'
 import { COINS } from '../lib/coins.js'
+import InfoTip from './InfoTip.jsx'
 
 const TIMEFRAMES = [
   { value: '5m', label: '5 min' },
@@ -14,6 +15,15 @@ const DIRECTIONS = [
   { value: 'short', label: 'Short only' },
   { value: 'both', label: 'Both (always in market)' },
 ]
+
+const PARAM_TIPS = {
+  corta: 'Length of the fast moving average, in candles. Reacts quickly to price changes.',
+  larga: 'Length of the slow moving average. A signal fires when the fast crosses the slow.',
+  periodo: 'How many candles RSI looks back. 14 is the classic value.',
+  compra: 'Enter long when RSI drops below this level — meaning the asset looks oversold.',
+  venta: 'Exit (or enter short) when RSI rises above this level — meaning it looks overbought.',
+  lookback: 'How many past candles define the breakout. A close above the highest high in this window = entry.',
+}
 
 export default function Controls({
   stratKey, params, onStratChange, onParamChange,
@@ -33,7 +43,9 @@ export default function Controls({
         <div className="group-label">Market</div>
         <div className="ctl-row">
           <div className="ctl">
-            <label htmlFor="coin">Coin</label>
+            <label htmlFor="coin">
+              Coin <InfoTip>Which cryptocurrency to backtest. Each has different volatility, liquidity and history.</InfoTip>
+            </label>
             <select
               id="coin"
               value={pair}
@@ -47,7 +59,9 @@ export default function Controls({
           </div>
 
           <div className="ctl">
-            <label htmlFor="tf">Timeframe</label>
+            <label htmlFor="tf">
+              Timeframe <InfoTip>How much time each candle represents. Shorter timeframes = more trades and more noise. Longer = fewer, cleaner signals.</InfoTip>
+            </label>
             <select
               id="tf"
               value={interval}
@@ -61,7 +75,9 @@ export default function Controls({
           </div>
 
           <div className="ctl">
-            <label htmlFor="from">From</label>
+            <label htmlFor="from">
+              From <InfoTip>Start date for the backtest. Candles before this date are excluded.</InfoTip>
+            </label>
             <input
               id="from"
               type="date"
@@ -73,7 +89,9 @@ export default function Controls({
           </div>
 
           <div className="ctl">
-            <label htmlFor="to">To</label>
+            <label htmlFor="to">
+              To <InfoTip>End date for the backtest. Candles after this date are excluded.</InfoTip>
+            </label>
             <input
               id="to"
               type="date"
@@ -90,7 +108,9 @@ export default function Controls({
         <div className="group-label">Strategy</div>
         <div className="ctl-row">
           <div className="ctl">
-            <label htmlFor="strat">Strategy</label>
+            <label htmlFor="strat">
+              Strategy <InfoTip>The rule the bot uses to decide when to enter and exit trades. Different rules suit different markets.</InfoTip>
+            </label>
             <select
               id="strat"
               value={stratKey}
@@ -103,7 +123,9 @@ export default function Controls({
           </div>
 
           <div className="ctl">
-            <label htmlFor="dir">Direction</label>
+            <label htmlFor="dir">
+              Direction <InfoTip>Long profits when price rises. Short profits when price falls. Both alternates between them — always in the market.</InfoTip>
+            </label>
             <select
               id="dir"
               value={direction}
@@ -119,7 +141,9 @@ export default function Controls({
 
           {S.params.map(p => (
             <div className="ctl" key={p.k}>
-              <label htmlFor={`p-${p.k}`}>{p.label}</label>
+              <label htmlFor={`p-${p.k}`}>
+                {p.label} {PARAM_TIPS[p.k] && <InfoTip>{PARAM_TIPS[p.k]}</InfoTip>}
+              </label>
               <input
                 id={`p-${p.k}`}
                 type="number"
@@ -142,7 +166,9 @@ export default function Controls({
         <div className="group-label">Money & risk</div>
         <div className="ctl-row">
           <div className="ctl">
-            <label htmlFor="amount">Amount ($)</label>
+            <label htmlFor="amount">
+              Amount ($) <InfoTip>Starting capital in dollars. The bot simulates as if you began with this much in your account.</InfoTip>
+            </label>
             <input
               id="amount"
               type="number"
@@ -159,8 +185,10 @@ export default function Controls({
           </div>
 
           <div className="ctl">
-            <label htmlFor="reinvest">Reinvest profits</label>
-            <label className="toggle" htmlFor="reinvest" title="On: compound profits into next trade. Off: each trade uses the same fixed amount.">
+            <label htmlFor="reinvest">
+              Reinvest profits <InfoTip>On (compounding): each trade reinvests previous gains or losses — positions grow when winning, shrink when losing. Off (fixed size): every trade uses the exact same amount, no matter the past results.</InfoTip>
+            </label>
+            <label className="toggle" htmlFor="reinvest">
               <input
                 id="reinvest"
                 type="checkbox"
@@ -172,7 +200,9 @@ export default function Controls({
           </div>
 
           <div className="ctl">
-            <label htmlFor="sl">Stop loss %</label>
+            <label htmlFor="sl">
+              Stop loss % <InfoTip>Forces an exit if price moves AGAINST you by this percent from entry. Caps how much each trade can lose. 0 = disabled.</InfoTip>
+            </label>
             <input
               id="sl"
               type="number"
@@ -189,7 +219,9 @@ export default function Controls({
           </div>
 
           <div className="ctl">
-            <label htmlFor="tp">Take profit %</label>
+            <label htmlFor="tp">
+              Take profit % <InfoTip>Forces an exit if price moves IN YOUR FAVOR by this percent from entry. Locks in a gain. 0 = disabled (let the strategy decide).</InfoTip>
+            </label>
             <input
               id="tp"
               type="number"

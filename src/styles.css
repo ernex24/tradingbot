@@ -209,6 +209,70 @@ input[type=date] {
 .tag-long { background: #e8f0fb; color: var(--accent); }
 .tag-short { background: #fde9e0; color: #b8531a; }
 
+.info {
+  position: relative;
+  display: inline-block;
+  margin-left: 4px;
+  cursor: help;
+  vertical-align: middle;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--line);
+  color: var(--mute);
+  font-size: 9px;
+  font-family: 'Times New Roman', serif;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1;
+}
+.info:hover .info-icon,
+.info:focus-within .info-icon {
+  background: var(--ink);
+  color: #fff;
+}
+.info-tip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 8px 10px;
+  border-radius: 3px;
+  width: 240px;
+  text-align: left;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 100;
+}
+.info-tip::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-bottom-color: var(--ink);
+}
+.info:hover .info-tip,
+.info:focus-within .info-tip {
+  opacity: 1;
+}
+
 .chartblock {
   padding: var(--s5) 0 var(--s4);
   border-bottom: 1px solid var(--line);

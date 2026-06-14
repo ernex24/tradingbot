@@ -8,12 +8,15 @@
 
 import { authFetch } from './supabase.js'
 
-// Coins available on Binance Spot Testnet. Subset of the backtest list —
-// the rest are backtest-only because the testnet doesn't list those pairs.
+// All coins shown in the UI are live on Binance Spot Testnet — every
+// one can be wired to an actual order. Verified against
+// testnet.binance.vision /api/v3/exchangeInfo.
 const COIN_TO_SYMBOL = {
-  BTC: 'BTCUSDT', ETH: 'ETHUSDT', BNB: 'BNBUSDT', SOL: 'SOLUSDT',
-  XRP: 'XRPUSDT', ADA: 'ADAUSDT', DOGE: 'DOGEUSDT', LTC: 'LTCUSDT',
-  LINK: 'LINKUSDT', DOT: 'DOTUSDT',
+  BTC: 'BTCUSDT', ETH: 'ETHUSDT', BNB: 'BNBUSDT', XRP: 'XRPUSDT',
+  SOL: 'SOLUSDT', DOGE: 'DOGEUSDT', ADA: 'ADAUSDT', AVAX: 'AVAXUSDT',
+  TRX: 'TRXUSDT', LINK: 'LINKUSDT', DOT: 'DOTUSDT', LTC: 'LTCUSDT',
+  POL: 'POLUSDT', SHIB: 'SHIBUSDT', UNI: 'UNIUSDT', ATOM: 'ATOMUSDT',
+  NEAR: 'NEARUSDT', APT: 'APTUSDT', SUI: 'SUIUSDT', PEPE: 'PEPEUSDT',
 }
 
 export function symbolFor(coin) {

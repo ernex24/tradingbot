@@ -1,25 +1,27 @@
-// Coins available on Binance Spot. All data and execution comes from Binance.
-// `testnet` flag marks pairs known to exist on Binance Spot Testnet — those
-// can be used by live Testnet bots; the rest are backtest-only.
+// Top 20 popular coins on Binance Spot Testnet (verified against
+// /api/v3/exchangeInfo). All are USDT-quoted and tradeable, so every
+// one can power a live Testnet bot.
 export const COINS = [
-  { value: 'BTC',   label: 'Bitcoin (BTC)',     symbol: 'BTC',   testnet: true  },
-  { value: 'ETH',   label: 'Ethereum (ETH)',    symbol: 'ETH',   testnet: true  },
-  { value: 'BNB',   label: 'BNB',               symbol: 'BNB',   testnet: true  },
-  { value: 'SOL',   label: 'Solana (SOL)',      symbol: 'SOL',   testnet: true  },
-  { value: 'XRP',   label: 'XRP',               symbol: 'XRP',   testnet: true  },
-  { value: 'ADA',   label: 'Cardano (ADA)',     symbol: 'ADA',   testnet: true  },
-  { value: 'DOGE',  label: 'Dogecoin (DOGE)',   symbol: 'DOGE',  testnet: true  },
-  { value: 'LTC',   label: 'Litecoin (LTC)',    symbol: 'LTC',   testnet: true  },
-  { value: 'LINK',  label: 'Chainlink (LINK)',  symbol: 'LINK',  testnet: true  },
-  { value: 'DOT',   label: 'Polkadot (DOT)',    symbol: 'DOT',   testnet: true  },
-  { value: 'AVAX',  label: 'Avalanche (AVAX)',  symbol: 'AVAX',  testnet: false },
-  { value: 'TRX',   label: 'TRON (TRX)',        symbol: 'TRX',   testnet: false },
-  { value: 'ATOM',  label: 'Cosmos (ATOM)',     symbol: 'ATOM',  testnet: false },
-  { value: 'NEAR',  label: 'NEAR (NEAR)',       symbol: 'NEAR',  testnet: false },
-  { value: 'SUI',   label: 'Sui (SUI)',         symbol: 'SUI',   testnet: false },
-  { value: 'APT',   label: 'Aptos (APT)',       symbol: 'APT',   testnet: false },
-  { value: 'INJ',   label: 'Injective (INJ)',   symbol: 'INJ',   testnet: false },
-  { value: 'TIA',   label: 'Celestia (TIA)',    symbol: 'TIA',   testnet: false },
+  { value: 'BTC',   label: 'Bitcoin (BTC)',       symbol: 'BTC'   },
+  { value: 'ETH',   label: 'Ethereum (ETH)',      symbol: 'ETH'   },
+  { value: 'BNB',   label: 'BNB',                 symbol: 'BNB'   },
+  { value: 'XRP',   label: 'XRP',                 symbol: 'XRP'   },
+  { value: 'SOL',   label: 'Solana (SOL)',        symbol: 'SOL'   },
+  { value: 'DOGE',  label: 'Dogecoin (DOGE)',     symbol: 'DOGE'  },
+  { value: 'ADA',   label: 'Cardano (ADA)',       symbol: 'ADA'   },
+  { value: 'AVAX',  label: 'Avalanche (AVAX)',    symbol: 'AVAX'  },
+  { value: 'TRX',   label: 'TRON (TRX)',          symbol: 'TRX'   },
+  { value: 'LINK',  label: 'Chainlink (LINK)',    symbol: 'LINK'  },
+  { value: 'DOT',   label: 'Polkadot (DOT)',      symbol: 'DOT'   },
+  { value: 'LTC',   label: 'Litecoin (LTC)',      symbol: 'LTC'   },
+  { value: 'POL',   label: 'Polygon (POL)',       symbol: 'POL'   },
+  { value: 'SHIB',  label: 'Shiba Inu (SHIB)',    symbol: 'SHIB'  },
+  { value: 'UNI',   label: 'Uniswap (UNI)',       symbol: 'UNI'   },
+  { value: 'ATOM',  label: 'Cosmos (ATOM)',       symbol: 'ATOM'  },
+  { value: 'NEAR',  label: 'NEAR Protocol',       symbol: 'NEAR'  },
+  { value: 'APT',   label: 'Aptos (APT)',         symbol: 'APT'   },
+  { value: 'SUI',   label: 'Sui (SUI)',           symbol: 'SUI'   },
+  { value: 'PEPE',  label: 'Pepe (PEPE)',         symbol: 'PEPE'  },
 ]
 
 export function coinByPair(pair) {

@@ -10,7 +10,10 @@ export const usdPrecise = n => n.toLocaleString('en-US', {
 
 export const signed = n => {
   const sign = n >= 0 ? '+' : '-'
-  return sign + Math.round(Math.abs(n)).toLocaleString('en-US') + ' USDT'
+  return sign + Math.abs(n).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }) + ' USDT'
 }
 export const pct = n => (n >= 0 ? '+' : '') + n.toFixed(1) + '%'
 

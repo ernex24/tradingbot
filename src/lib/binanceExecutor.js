@@ -89,6 +89,26 @@ function applyExit(state, exitPriceFallback, currentTime, reason, order) {
   }
 }
 
+// Sells the bot's current open position at market and returns the
+// new state with the trade moved to closedTrades. Used by the
+// "Close now" button and the "Close & delete" path.
+export async function closeOpenPosition(state, coin, testnet, reason = 'manual') {
+  const op = state.openPosition
+  if (!op) return state
+  if (op.side !== 1) throw new Error('Only long positions can be closed via spot SELL')
+  const symbol = symbolFor(coin)
+  if (!symbol) throw new Error(`${coin} not available on Binance Spot`)
+  const order = await placeMarket(testnet, symbol, 'SELL', {
+    quantity: op.qty.toFixed(8),
+  })
+  const next = applyExit(state, op.entryPrice, Date.now(), reason, order)
+  return {
+    ...next,
+    lastTickAt: Date.now(),
+    lastPrice: order.avgPrice ?? state.lastPrice,
+  }
+}
+
 // async drop-in replacement for paperTrader.tick when bot.config.executor
 // is 'binance-testnet'.
 export async function executeTick(state, signal, currentPrice, currentCandle, currentTime, opts) {

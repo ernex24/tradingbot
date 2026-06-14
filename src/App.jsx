@@ -4,7 +4,7 @@ import { STRATS } from './lib/strategies.js'
 import { backtest } from './lib/backtest.js'
 import { coinByPair } from './lib/coins.js'
 import { createInitialState, floatingPnL } from './lib/paperTrader.js'
-import { executeTick as binanceTick, executorSupportsCoin } from './lib/binanceExecutor.js'
+import { executeTick as binanceTick, executorSupportsCoin, closeOpenPosition } from './lib/binanceExecutor.js'
 import { binanceStream } from './lib/binanceStream.js'
 import { supabase, authFetch } from './lib/supabase.js'
 import { usdPrecise, signed } from './lib/format.js'
@@ -247,6 +247,24 @@ export default function App() {
   }
   const handleDeleteBot = (id) => {
     setBots(prev => prev.filter(b => b.id !== id))
+  }
+
+  // Sends a market SELL for the bot's open position. Resolves to the
+  // new bot state (with the trade moved to closedTrades) or throws on
+  // API/auth error.
+  const handleCloseBotPosition = async (id) => {
+    const bot = botsRef.current.find(b => b.id === id)
+    if (!bot || !bot.state.openPosition) return null
+    const newState = await closeOpenPosition(
+      bot.state,
+      bot.config.pair,
+      true,
+      'manual'
+    )
+    setBots(prev => prev.map(b =>
+      b.id === id ? { ...b, state: { ...newState, candles: b.state.candles } } : b
+    ))
+    return newState
   }
 
   // Multi-bot streaming + polling ----------------------------------
@@ -559,6 +577,7 @@ export default function App() {
             bots={bots}
             onToggleBot={handleToggleBot}
             onDeleteBot={handleDeleteBot}
+            onCloseBotPosition={handleCloseBotPosition}
           />
         )}
 

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { equity, floatingPnL } from '../lib/paperTrader.js'
 import { price, usdPrecise, signed, pct, qty as fmtQty } from '../lib/format.js'
 import { coinByPair } from '../lib/coins.js'
@@ -108,12 +109,82 @@ function buildChartData(bot) {
   return { recent, lines, trades }
 }
 
-function PositionsTable({ bot, symbol }) {
+function DeleteDialog({ bot, busy, onCloseAndDelete, onDeleteOnly, onCancel }) {
+  const op = bot.state.openPosition
+  const coin = coinByPair(bot.config.pair)
+  const fp = op && bot.state.lastPrice ? floatingPnL(op, bot.state.lastPrice) : 0
+  return (
+    <div className="modal-backdrop" onClick={busy ? undefined : onCancel}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <h3 className="modal-title">Delete bot "{bot.name}"?</h3>
+        {op ? (
+          <>
+            <div className="modal-body">
+              <p>This bot has an open position:</p>
+              <p>
+                {sideTag(op.side)} {fmtQty(op.qty, coin.symbol)} ·
+                {' '}entry {price(op.entryPrice)}
+                {bot.state.lastPrice && (
+                  <>
+                    {' '}· live {price(bot.state.lastPrice)}{' '}
+                    <span className={fp >= 0 ? 'pos' : 'neg'}>({signed(fp)})</span>
+                  </>
+                )}
+              </p>
+              <p style={{ color: 'var(--mute)', fontSize: 13 }}>
+                If you delete the bot without closing, the <b>{coin.symbol} stays in your
+                Binance Testnet wallet</b> as an orphan and you'd need to sell it manually
+                from the Account tab to get USDT back.
+              </p>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn" onClick={onCloseAndDelete} disabled={busy}>
+                {busy ? 'Selling at market…' : 'Close position & delete'}
+              </button>
+              <button type="button" className="btn-ghost btn-danger" onClick={onDeleteOnly} disabled={busy}>
+                Delete anyway (keep coins)
+              </button>
+              <button type="button" className="btn-ghost" onClick={onCancel} disabled={busy}>
+                Cancel
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="modal-body">
+              <p>Closed trades history will be lost.</p>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn-ghost btn-danger" onClick={onDeleteOnly}>Delete</button>
+              <button type="button" className="btn-ghost" onClick={onCancel}>Cancel</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function PositionsTable({ bot, symbol, onCloseOpen }) {
   const { state } = bot
   const op = state.openPosition
   const closed = state.closedTrades
+  const [closing, setClosing] = useState(false)
 
   if (!op && !closed.length) return null
+
+  const handleClose = async () => {
+    if (closing) return
+    if (!confirm(`Sell ${fmtQty(op.qty, symbol)} at market and close this position?`)) return
+    setClosing(true)
+    try {
+      await onCloseOpen(bot.id)
+    } catch (e) {
+      alert('Failed to close: ' + (e?.message || e))
+    } finally {
+      setClosing(false)
+    }
+  }
 
   const rows = []
   if (op) {
@@ -159,8 +230,21 @@ function PositionsTable({ bot, symbol }) {
 
   return (
     <div className="bot-trades">
-      <div className="label" style={{ marginBottom: 'var(--s2)' }}>
-        Positions ({closed.length} closed{op ? ' · 1 open' : ''})
+      <div className="bot-trades-head">
+        <div className="label">
+          Positions ({closed.length} closed{op ? ' · 1 open' : ''})
+        </div>
+        {op && onCloseOpen && (
+          <button
+            type="button"
+            className="btn-ghost btn-danger btn-close-now"
+            onClick={handleClose}
+            disabled={closing}
+            title="Send a MARKET SELL to Binance Testnet for the full position quantity"
+          >
+            {closing ? 'Selling…' : `Close ${fmtQty(op.qty, symbol)} now`}
+          </button>
+        )}
       </div>
       <div className="bot-trades-scroll">
         <table>
@@ -232,7 +316,7 @@ function PositionsTable({ bot, symbol }) {
   )
 }
 
-function BotCard({ bot, onToggle, onDelete }) {
+function BotCard({ bot, onToggle, onDelete, onCloseBotPosition }) {
   const { config, state } = bot
   const coin = coinByPair(config.pair)
   const S = STRATS[config.stratKey]
@@ -243,6 +327,25 @@ function BotCard({ bot, onToggle, onDelete }) {
   const cls = pnl >= 0 ? 'pos' : 'neg'
   const chart = buildChartData(bot)
   const [l1, l2] = S.leyenda(config.params)
+  const [deleting, setDeleting] = useState(false)
+  const [closingForDelete, setClosingForDelete] = useState(false)
+
+  const handleCloseAndDelete = async () => {
+    setClosingForDelete(true)
+    try {
+      await onCloseBotPosition(bot.id)
+      onDelete(bot.id)
+      setDeleting(false)
+    } catch (e) {
+      alert('Could not close: ' + (e?.message || e))
+    } finally {
+      setClosingForDelete(false)
+    }
+  }
+  const handleDeleteOnly = () => {
+    onDelete(bot.id)
+    setDeleting(false)
+  }
 
   return (
     <div className="bot-card">
@@ -275,9 +378,7 @@ function BotCard({ bot, onToggle, onDelete }) {
           <button
             type="button"
             className="btn-ghost btn-danger"
-            onClick={() => {
-              if (confirm(`Delete bot "${bot.name}"? Closed trades will be lost.`)) onDelete(bot.id)
-            }}
+            onClick={() => setDeleting(true)}
           >
             Delete
           </button>
@@ -335,7 +436,17 @@ function BotCard({ bot, onToggle, onDelete }) {
         )}
       </div>
 
-      <PositionsTable bot={bot} symbol={coin.symbol} />
+      <PositionsTable bot={bot} symbol={coin.symbol} onCloseOpen={onCloseBotPosition} />
+
+      {deleting && (
+        <DeleteDialog
+          bot={bot}
+          busy={closingForDelete}
+          onCloseAndDelete={handleCloseAndDelete}
+          onDeleteOnly={handleDeleteOnly}
+          onCancel={() => setDeleting(false)}
+        />
+      )}
     </div>
   )
 }
@@ -423,7 +534,7 @@ function TotalsCard({ bots }) {
   )
 }
 
-export default function TradesView({ bots, onToggleBot, onDeleteBot }) {
+export default function TradesView({ bots, onToggleBot, onDeleteBot, onCloseBotPosition }) {
   return (
     <div className="trades-view">
       <div className="trades-head">
@@ -445,6 +556,7 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot }) {
               bot={b}
               onToggle={onToggleBot}
               onDelete={onDeleteBot}
+              onCloseBotPosition={onCloseBotPosition}
             />
           ))}
         </div>

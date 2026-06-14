@@ -479,6 +479,56 @@ input[type=date] {
 .totals-table td.pos { color: var(--pos); }
 .totals-table td.neg { color: var(--neg); }
 
+.bot-trades-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--s2);
+  gap: var(--s3);
+  flex-wrap: wrap;
+}
+.btn-close-now {
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 10, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  padding: var(--s4);
+}
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  max-width: 520px;
+  width: 100%;
+  padding: var(--s4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+.modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: var(--s2);
+}
+.modal-body p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+.modal-body .pos { color: var(--pos); }
+.modal-body .neg { color: var(--neg); }
+.modal-actions {
+  margin-top: var(--s3);
+  display: flex;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+
 .tag-src {
   font-size: 10px;
   padding: 2px 6px;

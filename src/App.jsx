@@ -4,27 +4,25 @@ import { STRATS } from './lib/strategies.js'
 import { backtest } from './lib/backtest.js'
 import { coinByPair, SOURCE_LABELS } from './lib/coins.js'
 import { createInitialState, tick as paperTick } from './lib/paperTrader.js'
+import Tabs from './components/Tabs.jsx'
 import Controls from './components/Controls.jsx'
 import KPIs from './components/KPIs.jsx'
 import PriceChart from './components/PriceChart.jsx'
 import EquityChart from './components/EquityChart.jsx'
 import TradeTable from './components/TradeTable.jsx'
-import PaperPanel from './components/PaperPanel.jsx'
+import TradesView from './components/TradesView.jsx'
 
-const PAPER_STORAGE_KEY = 'paperTrader.v1'
-const PAPER_POLL_MS = 30000
+const BOTS_STORAGE_KEY = 'paperBots.v2'
+const POLL_MS = 30000
 
-function loadPaperState() {
+function loadBots() {
   try {
-    const raw = localStorage.getItem(PAPER_STORAGE_KEY)
-    return raw ? JSON.parse(raw) : null
-  } catch { return null }
+    const raw = localStorage.getItem(BOTS_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
 }
-function savePaperState(state) {
-  try {
-    if (state) localStorage.setItem(PAPER_STORAGE_KEY, JSON.stringify(state))
-    else localStorage.removeItem(PAPER_STORAGE_KEY)
-  } catch {}
+function saveBots(bots) {
+  try { localStorage.setItem(BOTS_STORAGE_KEY, JSON.stringify(bots)) } catch {}
 }
 
 function defaultParams(stratKey) {
@@ -33,10 +31,15 @@ function defaultParams(stratKey) {
   return out
 }
 
-// Candle `f` is either 'YYYY-MM-DD' or 'YYYY-MM-DD HH:mm'.
 const datePart = s => (s ? s.slice(0, 10) : '')
 
+function newId() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4)
+}
+
 export default function App() {
+  const [tab, setTab] = useState('backtest')
+
   const [candles, setCandles] = useState(DEMO_CANDLES)
   const [dataSrc, setDataSrc] = useState('loading live data…')
   const [updatedAt, setUpdatedAt] = useState('')
@@ -53,9 +56,8 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
 
-  const [paperEnabled, setPaperEnabled] = useState(false)
-  const [paperState, setPaperState] = useState(() => loadPaperState())
-  const [paperPrice, setPaperPrice] = useState(null)
+  const [bots, setBots] = useState(() => loadBots())
+  useEffect(() => { saveBots(bots) }, [bots])
 
   const coin = coinByPair(pair)
 
@@ -163,89 +165,108 @@ export default function App() {
     cargarOhlc(interval, pair, src)
   }
 
-  // Auto-fetch live data on first mount.
   useEffect(() => {
     cargarOhlc()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Refs so the polling closure always sees the latest state/config.
-  const paperStateRef = useRef(paperState)
-  useEffect(() => { paperStateRef.current = paperState }, [paperState])
-  const paperCfgRef = useRef(null)
-  paperCfgRef.current = {
-    pair, source, interval, stratKey, params, direction,
-    stopPct, takePct, stake, compound,
-    effectiveDirection,
-  }
+  // Bot management --------------------------------------------------
 
-  const handlePaperToggle = (on) => {
-    if (on && !paperState) {
-      const fresh = createInitialState(stake)
-      setPaperState(fresh)
-      savePaperState(fresh)
+  const currentConfigLabel = `${coin.symbol} · ${S.nombre} · ${effectiveDirection}`
+
+  const handleCreateBot = () => {
+    const id = newId()
+    const baseName = currentConfigLabel
+    const sameNameCount = bots.filter(b => b.name.startsWith(baseName)).length
+    const name = sameNameCount > 0 ? `${baseName} #${sameNameCount + 1}` : baseName
+    const bot = {
+      id,
+      name,
+      createdAt: Date.now(),
+      running: true,
+      config: {
+        pair, source, interval,
+        stratKey,
+        params: { ...params },
+        direction,
+        effectiveDirection,
+        stopPct, takePct,
+        stake, compound,
+      },
+      state: createInitialState(stake),
     }
-    setPaperEnabled(on)
+    setBots(prev => [...prev, bot])
+    setTab('trades')
   }
-  const handlePaperReset = () => {
-    setPaperEnabled(false)
-    setPaperState(null)
-    setPaperPrice(null)
-    savePaperState(null)
+  const handleToggleBot = (id) => {
+    setBots(prev => prev.map(b => b.id === id ? { ...b, running: !b.running } : b))
+  }
+  const handleDeleteBot = (id) => {
+    setBots(prev => prev.filter(b => b.id !== id))
   }
 
-  // Polling loop while paper trading is on.
+  // Multi-bot polling ----------------------------------------------
+
+  const botsRef = useRef(bots)
+  useEffect(() => { botsRef.current = bots }, [bots])
+
   useEffect(() => {
-    if (!paperEnabled) return
     let stopped = false
+    const runAllTicks = async () => {
+      const all = botsRef.current
+      const running = all.filter(b => b.running)
+      if (!running.length) return
 
-    const runTick = async () => {
-      const cfg = paperCfgRef.current
-      try {
-        const r = await fetch(
-          `/api/ohlc?coin=${cfg.pair}&interval=${cfg.interval}&source=${cfg.source}&_=${Date.now()}`,
-          { cache: 'no-store' }
-        )
-        const data = await r.json()
-        if (!r.ok || data.error) return
-        const rows = data.candles
-        if (!rows || rows.length < 2) return
-        const intraday = cfg.interval !== '1d'
-        const liveCandles = rows.map(row => {
-          const iso = new Date(row.t).toISOString()
-          return {
-            f: intraday ? iso.slice(0, 16).replace('T', ' ') : iso.slice(0, 10),
-            o: row.o, h: row.h, l: row.l, c: row.c, t: row.t,
-          }
-        })
-        const Slive = STRATS[cfg.stratKey]
-        const dir = Slive.supportsDirection ? cfg.direction : 'long'
-        const { pos } = Slive.run(liveCandles, cfg.params, dir)
-        const last = liveCandles[liveCandles.length - 1]
-        const signal = pos[pos.length - 1] | 0
-        const currentPrice = last.c
+      const updates = await Promise.all(running.map(async (bot) => {
+        const cfg = bot.config
+        try {
+          const r = await fetch(
+            `/api/ohlc?coin=${cfg.pair}&interval=${cfg.interval}&source=${cfg.source}&_=${Date.now()}`,
+            { cache: 'no-store' }
+          )
+          const data = await r.json()
+          if (!r.ok || data.error) return null
+          const rows = data.candles
+          if (!rows || rows.length < 2) return null
+          const intraday = cfg.interval !== '1d'
+          const liveCandles = rows.map(row => {
+            const iso = new Date(row.t).toISOString()
+            return {
+              f: intraday ? iso.slice(0, 16).replace('T', ' ') : iso.slice(0, 10),
+              o: row.o, h: row.h, l: row.l, c: row.c, t: row.t,
+            }
+          })
+          const Slive = STRATS[cfg.stratKey]
+          const dir = Slive.supportsDirection ? cfg.direction : 'long'
+          const { pos } = Slive.run(liveCandles, cfg.params, dir)
+          const last = liveCandles[liveCandles.length - 1]
+          const signal = pos[pos.length - 1] | 0
+          const next = paperTick(bot.state, signal, last.c, last, Date.now(), {
+            stopPct: cfg.stopPct,
+            takePct: cfg.takePct,
+            compound: cfg.compound,
+            fixedStake: cfg.stake,
+          })
+          return { id: bot.id, state: next }
+        } catch (e) {
+          console.warn(`bot ${bot.name} tick failed:`, e)
+          return null
+        }
+      }))
 
-        const prev = paperStateRef.current
-        if (!prev) return
-        const next = paperTick(prev, signal, currentPrice, last, Date.now(), {
-          stopPct: cfg.stopPct,
-          takePct: cfg.takePct,
-          compound: cfg.compound,
-          fixedStake: cfg.stake,
-        })
-        if (stopped) return
-        setPaperState(next)
-        savePaperState(next)
-        setPaperPrice(currentPrice)
-      } catch (e) {
-        console.warn('paper tick failed:', e)
-      }
+      if (stopped) return
+      setBots(prev => prev.map(b => {
+        const u = updates.find(x => x && x.id === b.id)
+        return u ? { ...b, state: u.state } : b
+      }))
     }
 
-    runTick()
-    const id = setInterval(runTick, PAPER_POLL_MS)
+    runAllTicks()
+    const id = setInterval(runAllTicks, POLL_MS)
     return () => { stopped = true; clearInterval(id) }
-  }, [paperEnabled])
+  }, [])
+
+  // Render ----------------------------------------------------------
 
   const [l1, l2] = S.leyenda(params)
   const rango = visibleCandles.length
@@ -269,96 +290,114 @@ export default function App() {
           </div>
         </header>
 
-        <Controls
-          stratKey={stratKey}
-          params={params}
-          onStratChange={handleStratChange}
-          onParamChange={handleParamChange}
-          pair={pair}
-          onPairChange={handlePairChange}
-          source={source}
-          onSourceChange={handleSourceChange}
-          interval={interval}
-          onIntervalChange={handleIntervalChange}
-          desde={desde}
-          hasta={hasta}
-          minDate={minDate}
-          maxDate={maxDate}
-          onDateChange={handleDateChange}
-          stopPct={stopPct}
-          takePct={takePct}
-          onStopChange={setStopPct}
-          onTakeChange={setTakePct}
-          stake={stake}
-          compound={compound}
-          onStakeChange={setStake}
-          onCompoundChange={setCompound}
-          direction={direction}
-          directionSupported={S.supportsDirection}
-          onDirectionChange={setDirection}
-          loading={loading}
-        />
+        <Tabs tab={tab} onChange={setTab} tradeCount={bots.length} />
 
-        {paramError && <div className="warn">{paramError}</div>}
-        {rangeWarn && <div className="warn">{rangeWarn}</div>}
-        {loadError && <div className="warn">{loadError}</div>}
-
-        {result && <KPIs met={result.met} stake={stake} />}
-
-        <section className="chartblock">
-          <div className="chead">
-            <div className="label">Candles, moving averages and trades</div>
-            <div className="legend">
-              <span><span className="sw" style={{ background: 'var(--accent)' }}></span>{l1}</span>
-              <span><span className="sw" style={{ background: '#9aa0a6' }}></span>{l2}</span>
-              <span><span className="tri-up"></span>Buy</span>
-              <span><span className="tri-dn"></span>Sell</span>
-            </div>
-          </div>
-          {result && (
-            <PriceChart
-              candles={visibleCandles}
-              lines={result.lines}
-              trades={result.trades}
-            />
-          )}
-        </section>
-
-        <section className="chartblock">
-          <div className="chead">
-            <div className="label">
-              Your money over time · ${stake.toLocaleString('en-US')} invested
-              {!compound && <span style={{ color: 'var(--mute)', fontWeight: 400 }}> · fixed size per trade</span>}
-            </div>
-            <div className="legend">
-              <span><span className="sw" style={{ background: 'var(--accent)' }}></span>With the strategy</span>
-              <span><span className="sw" style={{ background: 'var(--mute)' }}></span>Buy and hold</span>
-            </div>
-          </div>
-          {result && (
-            <EquityChart
-              eqArr={result.eqArr}
-              bhArr={result.bhArr}
-              candles={visibleCandles}
+        {tab === 'backtest' && (
+          <>
+            <Controls
+              stratKey={stratKey}
+              params={params}
+              onStratChange={handleStratChange}
+              onParamChange={handleParamChange}
+              pair={pair}
+              onPairChange={handlePairChange}
+              source={source}
+              onSourceChange={handleSourceChange}
+              interval={interval}
+              onIntervalChange={handleIntervalChange}
+              desde={desde}
+              hasta={hasta}
+              minDate={minDate}
+              maxDate={maxDate}
+              onDateChange={handleDateChange}
+              stopPct={stopPct}
+              takePct={takePct}
+              onStopChange={setStopPct}
+              onTakeChange={setTakePct}
               stake={stake}
+              compound={compound}
+              onStakeChange={setStake}
+              onCompoundChange={setCompound}
+              direction={direction}
+              directionSupported={S.supportsDirection}
+              onDirectionChange={setDirection}
+              loading={loading}
             />
-          )}
-        </section>
 
-        {result && <TradeTable trades={result.trades} symbol={coin.symbol} />}
+            <div className="post-controls">
+              <button
+                type="button"
+                className="btn"
+                onClick={handleCreateBot}
+                disabled={!!paramError || !!rangeWarn}
+                title={(paramError || rangeWarn) ? 'Fix the warnings before saving' : 'Save this config as a live paper bot'}
+              >
+                + Save as paper bot
+              </button>
+              <span style={{ color: 'var(--mute)', fontSize: 13, marginLeft: 12 }}>
+                Will be named: <b>{currentConfigLabel}</b>
+              </span>
+            </div>
 
-        <PaperPanel
-          enabled={paperEnabled}
-          state={paperState}
-          currentPrice={paperPrice}
-          symbol={coin.symbol}
-          coinLabel={`${coin.symbol} (${SOURCE_LABELS[source]})`}
-          intervalLabel={interval}
-          stratLabel={S.nombre}
-          dirLabel={effectiveDirection}
-          onToggle={handlePaperToggle}
-          onReset={handlePaperReset}
-        />
+            {paramError && <div className="warn">{paramError}</div>}
+            {rangeWarn && <div className="warn">{rangeWarn}</div>}
+            {loadError && <div className="warn">{loadError}</div>}
+
+            {result && <KPIs met={result.met} stake={stake} />}
+
+            <section className="chartblock">
+              <div className="chead">
+                <div className="label">Candles, moving averages and trades</div>
+                <div className="legend">
+                  <span><span className="sw" style={{ background: 'var(--accent)' }}></span>{l1}</span>
+                  <span><span className="sw" style={{ background: '#9aa0a6' }}></span>{l2}</span>
+                  <span><span className="tri-up"></span>Buy</span>
+                  <span><span className="tri-dn"></span>Sell</span>
+                </div>
+              </div>
+              {result && (
+                <PriceChart
+                  candles={visibleCandles}
+                  lines={result.lines}
+                  trades={result.trades}
+                />
+              )}
+            </section>
+
+            <section className="chartblock">
+              <div className="chead">
+                <div className="label">
+                  Your money over time · ${stake.toLocaleString('en-US')} invested
+                  {!compound && <span style={{ color: 'var(--mute)', fontWeight: 400 }}> · fixed size per trade</span>}
+                </div>
+                <div className="legend">
+                  <span><span className="sw" style={{ background: 'var(--accent)' }}></span>With the strategy</span>
+                  <span><span className="sw" style={{ background: 'var(--mute)' }}></span>Buy and hold</span>
+                </div>
+              </div>
+              {result && (
+                <EquityChart
+                  eqArr={result.eqArr}
+                  bhArr={result.bhArr}
+                  candles={visibleCandles}
+                  stake={stake}
+                />
+              )}
+            </section>
+
+            {result && <TradeTable trades={result.trades} symbol={coin.symbol} />}
+          </>
+        )}
+
+        {tab === 'trades' && (
+          <TradesView
+            bots={bots}
+            onToggleBot={handleToggleBot}
+            onDeleteBot={handleDeleteBot}
+            onCreateBot={handleCreateBot}
+            currentConfigLabel={currentConfigLabel}
+          />
+        )}
 
         <footer>
           Research tool, not financial advice. Demo figures do not predict future performance.

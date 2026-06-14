@@ -41,6 +41,7 @@ export function backtest(c, posRaw, opts = {}) {
     const investedUSD = compound ? entryEq * stake : stake
     const qty = investedUSD / entryPrice
     const sides = kind === 'open' ? 1 : 2
+    const feeUSD = investedUSD * COM * sides
     const pnlUSD = investedUSD * (gross - sides * COM)
     trades.push({
       ci: entryIdx, cf: c[entryIdx].f, cp: entryPrice,
@@ -50,7 +51,8 @@ export function backtest(c, posRaw, opts = {}) {
       ret: gross * 100,
       retNet: (gross - sides * COM) * 100,
       reason,
-      qty, investedUSD, pnlUSD,
+      qty, investedUSD, pnlUSD, feeUSD,
+      sides,
     })
   }
 

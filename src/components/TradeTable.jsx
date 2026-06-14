@@ -16,6 +16,7 @@ function Header() {
         <th>Size</th>
         <th>Sold</th>
         <th className="r">Result (net)</th>
+        <th className="r">Fees</th>
         <th className="r">P&amp;L</th>
       </tr>
     </thead>
@@ -26,11 +27,12 @@ function Cols() {
   return (
     <colgroup>
       <col style={{ width: '4%' }} />
-      <col style={{ width: '22%' }} />
-      <col style={{ width: '20%' }} />
-      <col style={{ width: '26%' }} />
-      <col style={{ width: '14%' }} />
-      <col style={{ width: '14%' }} />
+      <col style={{ width: '21%' }} />
+      <col style={{ width: '18%' }} />
+      <col style={{ width: '24%' }} />
+      <col style={{ width: '12%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '12%' }} />
     </colgroup>
   )
 }
@@ -47,7 +49,7 @@ export default function TradeTable({ trades, symbol = 'BTC' }) {
           <Header />
           <tbody>
             <tr>
-              <td colSpan="6" style={{ color: 'var(--mute)' }}>
+              <td colSpan="7" style={{ color: 'var(--mute)' }}>
                 This strategy made no trades in the period.
               </td>
             </tr>
@@ -56,6 +58,9 @@ export default function TradeTable({ trades, symbol = 'BTC' }) {
       </section>
     )
   }
+
+  const totalFees = trades.reduce((s, t) => s + t.feeUSD, 0)
+  const totalPnL = trades.reduce((s, t) => s + t.pnlUSD, 0)
 
   return (
     <section className="tradeblock">
@@ -84,17 +89,33 @@ export default function TradeTable({ trades, symbol = 'BTC' }) {
                     : <span style={{ color: 'var(--mute)' }}>open · {price(t.vp)} {reasonTag(t.reason)}</span>}
                 </td>
                 <td className={`r res num ${cls}`}>{pct(t.retNet)}</td>
+                <td className="r num" style={{ color: 'var(--mute)' }}>
+                  {usdPrecise(t.feeUSD)}
+                  <div style={{ fontSize: 11 }}>{t.sides === 1 ? '1 side' : '2 sides'}</div>
+                </td>
                 <td className={`r res num ${cls}`}>{signed(t.pnlUSD)}</td>
               </tr>
             )
           })}
+          <tr style={{ borderTop: '1px solid var(--ink)' }}>
+            <td colSpan="4" className="label" style={{ paddingTop: 'var(--s3)' }}>
+              Totals
+            </td>
+            <td className="r" style={{ paddingTop: 'var(--s3)', color: 'var(--mute)' }}></td>
+            <td className="r num" style={{ paddingTop: 'var(--s3)', color: 'var(--mute)' }}>
+              {usdPrecise(totalFees)}
+            </td>
+            <td className={`r res num ${totalPnL >= 0 ? 'pos' : 'neg'}`} style={{ paddingTop: 'var(--s3)' }}>
+              {signed(totalPnL)}
+            </td>
+          </tr>
         </tbody>
       </table>
       <div className="tnote">
         Size = {symbol} bought and dollars invested at entry. With <b>compounding on</b>, position
         size grows or shrinks with previous results; with <b>fixed size</b>, every trade uses
-        the same amount. P&amp;L is the real dollar gain or loss for each trade,
-        net of 0.16% commission per side.
+        the same amount. <b>Fees</b> = 0.16% × invested × number of sides (2 = entry+exit, 1 = entry only on still-open trades).
+        <b>P&amp;L</b> is the real dollar gain or loss for each trade, already net of fees.
         Sold labels: <b>SL</b> = stop loss hit, <b>TP</b> = take profit hit, no tag = strategy signal.
       </div>
     </section>

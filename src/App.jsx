@@ -22,7 +22,13 @@ function loadBots() {
   } catch { return [] }
 }
 function saveBots(bots) {
-  try { localStorage.setItem(BOTS_STORAGE_KEY, JSON.stringify(bots)) } catch {}
+  try {
+    const slim = bots.map(b => ({
+      ...b,
+      state: { ...b.state, candles: undefined },
+    }))
+    localStorage.setItem(BOTS_STORAGE_KEY, JSON.stringify(slim))
+  } catch {}
 }
 
 function defaultParams(stratKey) {
@@ -247,7 +253,10 @@ export default function App() {
             compound: cfg.compound,
             fixedStake: cfg.stake,
           })
-          return { id: bot.id, state: next }
+          return {
+            id: bot.id,
+            state: { ...next, candles: liveCandles.slice(-300) },
+          }
         } catch (e) {
           console.warn(`bot ${bot.name} tick failed:`, e)
           return null

@@ -2,6 +2,9 @@ import { equity, floatingPnL } from '../lib/paperTrader.js'
 import { price, usdPrecise, signed, pct, qty as fmtQty } from '../lib/format.js'
 import { SOURCE_LABELS, coinByPair } from '../lib/coins.js'
 import { STRATS } from '../lib/strategies.js'
+import PriceChart from './PriceChart.jsx'
+
+const CHART_VISIBLE = 150
 
 function timestamp(ts) {
   if (!ts) return '—'
@@ -31,6 +34,80 @@ function sideTag(side) {
   return <span className="tag tag-long">LONG</span>
 }
 
+function sourceTag(source) {
+  return (
+    <span className={`tag tag-src tag-src-${source}`}>
+      {SOURCE_LABELS[source] || source}
+    </span>
+  )
+}
+
+// Find the latest candle index whose timestamp is <= time.
+function findIdx(candles, time) {
+  if (!time) return -1
+  for (let i = candles.length - 1; i >= 0; i--) {
+    if (candles[i].t <= time) return i
+  }
+  return -1
+}
+
+function buildChartData(bot) {
+  const candles = bot.state.candles
+  if (!candles || candles.length < 2) return null
+
+  const recent = candles.slice(-CHART_VISIBLE)
+  const offset = candles.length - recent.length
+
+  let lines = { a: [], b: [] }
+  try {
+    const Slive = STRATS[bot.config.stratKey]
+    const dir = Slive.supportsDirection ? bot.config.direction : 'long'
+    const full = Slive.run(candles, bot.config.params, dir)
+    lines = {
+      a: full.lines.a.slice(offset),
+      b: full.lines.b.slice(offset),
+    }
+  } catch {}
+
+  const trades = []
+  for (const t of bot.state.closedTrades) {
+    const ciFull = findIdx(candles, t.entryTime)
+    const viFull = findIdx(candles, t.exitTime)
+    const ci = ciFull - offset
+    const vi = viFull - offset
+    if (ci < 0 && vi < 0) continue
+    trades.push({
+      ci: Math.max(ci, 0),
+      cf: recent[Math.max(ci, 0)]?.f || '',
+      cp: t.entryPrice,
+      vi: vi >= 0 ? vi : (viFull >= 0 ? recent.length - 1 : null),
+      vf: vi >= 0 ? recent[vi]?.f || '' : null,
+      vp: t.exitPrice,
+      side: t.side,
+      reason: t.reason,
+    })
+  }
+  if (bot.state.openPosition) {
+    const op = bot.state.openPosition
+    const ciFull = findIdx(candles, op.entryTime)
+    const ci = ciFull - offset
+    if (ci >= 0) {
+      trades.push({
+        ci,
+        cf: recent[ci]?.f || '',
+        cp: op.entryPrice,
+        vi: null,
+        vf: null,
+        vp: bot.state.lastPrice ?? op.entryPrice,
+        side: op.side === 1 ? 'long' : 'short',
+        reason: 'open',
+      })
+    }
+  }
+
+  return { recent, lines, trades }
+}
+
 function BotCard({ bot, onToggle, onDelete }) {
   const { config, state } = bot
   const coin = coinByPair(config.pair)
@@ -40,15 +117,18 @@ function BotCard({ bot, onToggle, onDelete }) {
   const pnl = eq - state.startBalance
   const pnlPct = state.startBalance > 0 ? (pnl / state.startBalance) * 100 : 0
   const cls = pnl >= 0 ? 'pos' : 'neg'
+  const chart = buildChartData(bot)
+  const [l1, l2] = S.leyenda(config.params)
 
   return (
     <div className="bot-card">
       <div className="bot-head">
         <div>
-          <div className="bot-name">{bot.name}</div>
+          <div className="bot-name">
+            {bot.name} {sourceTag(config.source)}
+          </div>
           <div className="bot-meta">
-            {coin.symbol} · {SOURCE_LABELS[config.source]} · {config.interval} ·{' '}
-            {S.nombre} · {config.effectiveDirection}
+            {coin.symbol} · {config.interval} · {S.nombre} · {config.effectiveDirection}
             {config.stopPct > 0 && ` · SL ${config.stopPct}%`}
             {config.takePct > 0 && ` · TP ${config.takePct}%`}
             {' · '}{config.compound ? 'compounding' : 'fixed size'}
@@ -120,6 +200,30 @@ function BotCard({ bot, onToggle, onDelete }) {
           </div>
         </div>
       )}
+
+      <div className="bot-chart">
+        <div className="bot-chart-head">
+          <div className="label">Live · last {chart ? chart.recent.length : 0} candles</div>
+          <div className="legend">
+            <span><span className="sw" style={{ background: 'var(--accent)' }}></span>{l1}</span>
+            <span><span className="sw" style={{ background: '#9aa0a6' }}></span>{l2}</span>
+            <span><span className="tri-up"></span>Buy</span>
+            <span><span className="tri-dn"></span>Sell</span>
+          </div>
+        </div>
+        {chart ? (
+          <PriceChart
+            candles={chart.recent}
+            lines={chart.lines}
+            trades={chart.trades}
+            height={220}
+          />
+        ) : (
+          <div className="bot-chart-empty">
+            Waiting for first live candles… (poll every 30s)
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -132,6 +236,7 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot, onCreateBot
       pos: b.state.openPosition,
       live: b.state.lastPrice,
       coin: coinByPair(b.config.pair),
+      source: b.config.source,
     }))
 
   const closedRows = bots.flatMap(b =>
@@ -140,6 +245,7 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot, onCreateBot
       botName: b.name,
       botId: b.id,
       symbol: coinByPair(b.config.pair).symbol,
+      source: b.config.source,
       tradeIdx: i + 1,
     }))
   ).sort((a, b) => (b.exitTime || 0) - (a.exitTime || 0))
@@ -189,7 +295,7 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot, onCreateBot
             <table>
               <thead>
                 <tr>
-                  <th>Bot</th>
+                  <th>Bot · Market</th>
                   <th>Side</th>
                   <th>Bought</th>
                   <th>Live</th>
@@ -197,11 +303,17 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot, onCreateBot
                 </tr>
               </thead>
               <tbody>
-                {openRows.map(({ bot, pos, live, coin }) => {
+                {openRows.map(({ bot, pos, live, coin, source }) => {
                   const fp = live ? floatingPnL(pos, live) : 0
                   return (
                     <tr key={bot.id}>
-                      <td>{bot.name}</td>
+                      <td>
+                        {bot.name}
+                        <div style={{ marginTop: 2 }}>
+                          {sourceTag(source)}{' '}
+                          <span style={{ color: 'var(--mute)', fontSize: 11 }}>· {coin.symbol}</span>
+                        </div>
+                      </td>
                       <td>{sideTag(pos.side)}</td>
                       <td className="num">
                         {timestamp(pos.entryTime)} · {price(pos.entryPrice)}
@@ -235,7 +347,7 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot, onCreateBot
             <table>
               <thead>
                 <tr>
-                  <th>Bot</th>
+                  <th>Bot · Market</th>
                   <th>Side</th>
                   <th>Bought</th>
                   <th>Sold</th>
@@ -248,7 +360,13 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot, onCreateBot
                   const cls = t.netPct >= 0 ? 'pos' : 'neg'
                   return (
                     <tr key={`${t.botId}-${t.exitTime}-${t.entryTime}`}>
-                      <td>{t.botName}</td>
+                      <td>
+                        {t.botName}
+                        <div style={{ marginTop: 2 }}>
+                          {sourceTag(t.source)}{' '}
+                          <span style={{ color: 'var(--mute)', fontSize: 11 }}>· {t.symbol}</span>
+                        </div>
+                      </td>
                       <td>{sideTag(t.side)}</td>
                       <td className="num">
                         {timestamp(t.entryTime)} · {price(t.entryPrice)}

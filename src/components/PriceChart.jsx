@@ -1,7 +1,7 @@
 import { shortDate, tickIndices } from '../lib/axis.js'
 
 const W = 1180
-const H = 380
+const DEFAULT_H = 380
 const PAD = { t: 14, r: 8, b: 32, l: 8 }
 
 function linePath(arr, X, Y) {
@@ -16,7 +16,8 @@ function linePath(arr, X, Y) {
   return d.trim()
 }
 
-export default function PriceChart({ candles, lines, trades }) {
+export default function PriceChart({ candles, lines, trades, height = DEFAULT_H }) {
+  const H = height
   const n = candles.length
   const allv = candles.flatMap(c => [c.h, c.l])
     .concat(lines.a.filter(v => v != null))
@@ -31,7 +32,12 @@ export default function PriceChart({ candles, lines, trades }) {
   const ticks = tickIndices(n, 7)
 
   return (
-    <svg className="svg-price" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+    <svg
+      className="svg-price"
+      style={{ height: `${H}px` }}
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="none"
+    >
       {trades.map((t, k) => {
         const x1 = X(t.ci)
         const x2 = t.vi != null ? X(t.vi) : X(n - 1)

@@ -349,6 +349,38 @@ input[type=date] {
   margin-top: 4px;
 }
 
+.bot-chart {
+  margin-top: var(--s3);
+  padding-top: var(--s3);
+  border-top: 1px dashed var(--line);
+}
+.bot-chart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--s2);
+  flex-wrap: wrap;
+  gap: var(--s3);
+}
+.bot-chart-head .legend {
+  font-size: 11px;
+}
+.bot-chart-empty {
+  color: var(--mute);
+  font-size: 13px;
+  padding: var(--s3) 0;
+  text-align: center;
+}
+
+.tag-src {
+  font-size: 10px;
+  padding: 2px 6px;
+  vertical-align: middle;
+}
+.tag-src-binance { background: #fff3d6; color: #8c6a00; }
+.tag-src-kraken { background: #e0e9fb; color: #1d3a8a; }
+.tag-src-hyperliquid { background: #def4ec; color: #0e6b46; }
+
 .cross-block {
   padding: var(--s4) 0;
   border-top: 1px solid var(--line);

@@ -109,6 +109,20 @@ input[type=number] { width: 84px; }
   cursor: pointer;
 }
 .btn-ghost:hover { background: var(--subtle); }
+.btn-ghost.on {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 7px 0;
+}
+.toggle input { margin: 0; cursor: pointer; }
 input[type=date] {
   font-family: var(--font);
   font-size: 14px;

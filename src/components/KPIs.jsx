@@ -1,9 +1,8 @@
-import { STAKE } from '../lib/backtest.js'
 import { usd, signed, pct } from '../lib/format.js'
 
-export default function KPIs({ met }) {
-  const finalVal = STAKE * (1 + met.total / 100)
-  const ganancia = finalVal - STAKE
+export default function KPIs({ met, stake }) {
+  const finalVal = stake * (1 + met.total / 100)
+  const ganancia = finalVal - stake
 
   return (
     <section className="kpis">
@@ -11,7 +10,7 @@ export default function KPIs({ met }) {
         <div className="label">Strategy result</div>
         <div className={`big num ${met.total >= 0 ? 'pos' : 'neg'}`}>{pct(met.total)}</div>
         <div className="story">
-          You invested <b>{usd(STAKE)}</b> → you'd now have <b>{usd(finalVal)}</b>{' '}
+          You invested <b>{usd(stake)}</b> → you'd now have <b>{usd(finalVal)}</b>{' '}
           <span className="num">({signed(ganancia)})</span>
         </div>
         <div className="story" style={{ fontSize: 14, marginTop: 6 }}>

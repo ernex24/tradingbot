@@ -1,20 +1,19 @@
-import { STAKE } from '../lib/backtest.js'
 import { shortDate, tickIndices } from '../lib/axis.js'
 
 const W = 1180
 const H = 220
 const PAD = { t: 14, r: 8, b: 30, l: 8 }
 
-export default function EquityChart({ eqArr, bhArr, candles = [] }) {
-  const eq = eqArr.map(v => v * STAKE)
-  const bh = bhArr.map(v => v * STAKE)
+export default function EquityChart({ eqArr, bhArr, candles = [], stake = 1000 }) {
+  const eq = eqArr.map(v => v * stake)
+  const bh = bhArr.map(v => v * stake)
   const all = eq.concat(bh)
   const min = Math.min(...all)
   const max = Math.max(...all)
   const X = i => PAD.l + i / (eq.length - 1) * (W - PAD.l - PAD.r)
   const Y = v => PAD.t + (1 - (v - min) / (max - min)) * (H - PAD.t - PAD.b)
   const p = arr => arr.map((v, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1)).join(' ')
-  const y0 = Y(STAKE)
+  const y0 = Y(stake)
   const ticks = tickIndices(eq.length, 7)
 
   return (

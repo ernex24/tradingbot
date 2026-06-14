@@ -6,11 +6,14 @@ const TIMEFRAMES = [
   { value: '1440', label: '1 day' },
 ]
 
+const STAKE_PRESETS = [100, 1000, 10000]
+
 export default function Controls({
   stratKey, params, onStratChange, onParamChange,
   interval, onIntervalChange,
   desde, hasta, minDate, maxDate, onDateChange, onResetRange,
   stopPct, takePct, onStopChange, onTakeChange,
+  stake, compound, onStakeChange, onCompoundChange,
   onReload, loading,
 }) {
   const S = STRATS[stratKey]
@@ -65,6 +68,54 @@ export default function Controls({
                 />
               </div>
             ))}
+        </div>
+      </div>
+
+      <div className="ctl">
+        <label>Capital</label>
+        <div className="params">
+          <div className="pfield">
+            <span>Amount ($)</span>
+            <input
+              type="number"
+              value={stake}
+              min={1}
+              max={10000000}
+              step="1"
+              onChange={e => {
+                const v = +e.target.value
+                onStakeChange(Math.max(1, Number.isFinite(v) ? v : 1000))
+              }}
+              style={{ width: 110 }}
+            />
+          </div>
+          <div className="pfield">
+            <span>Quick</span>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {STAKE_PRESETS.map(v => (
+                <button
+                  key={v}
+                  type="button"
+                  className={'btn-ghost' + (stake === v ? ' on' : '')}
+                  onClick={() => onStakeChange(v)}
+                  style={{ padding: '7px 9px', fontSize: 12 }}
+                >
+                  ${v.toLocaleString('en-US')}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="pfield">
+            <span>Reinvest</span>
+            <label className="toggle" title="On: compound profits into next trade. Off: each trade uses the same fixed amount.">
+              <input
+                type="checkbox"
+                checked={compound}
+                onChange={e => onCompoundChange(e.target.checked)}
+              />
+              <span>{compound ? 'compounding' : 'fixed size'}</span>
+            </label>
+          </div>
         </div>
       </div>
 

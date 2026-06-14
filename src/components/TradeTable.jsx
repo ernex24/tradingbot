@@ -91,9 +91,10 @@ export default function TradeTable({ trades }) {
         </tbody>
       </table>
       <div className="tnote">
-        Size = BTC bought and dollars invested at entry (the bot reinvests previous profits,
-        so position size grows or shrinks over time). P&amp;L is the real dollar gain or loss
-        for each trade, net of 0.16% commission per side.
+        Size = BTC bought and dollars invested at entry. With <b>compounding on</b>, position
+        size grows or shrinks with previous results; with <b>fixed size</b>, every trade uses
+        the same amount. P&amp;L is the real dollar gain or loss for each trade,
+        net of 0.16% commission per side.
         Sold labels: <b>SL</b> = stop loss hit, <b>TP</b> = take profit hit, no tag = strategy signal.
       </div>
     </section>

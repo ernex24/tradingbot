@@ -26,6 +26,8 @@ export default function App() {
   const [interval, setIntervalState] = useState('1440')
   const [stopPct, setStopPct] = useState(0)
   const [takePct, setTakePct] = useState(0)
+  const [stake, setStake] = useState(1000)
+  const [compound, setCompound] = useState(true)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
 
@@ -63,8 +65,11 @@ export default function App() {
     if (paramError || rangeWarn) return null
     if (visibleCandles.length < 2) return null
     const { pos, lines } = S.run(visibleCandles, params)
-    return { ...backtest(visibleCandles, pos, { stopPct, takePct }), lines }
-  }, [visibleCandles, stratKey, params, paramError, rangeWarn, S, stopPct, takePct])
+    return {
+      ...backtest(visibleCandles, pos, { stopPct, takePct, stake, compound }),
+      lines,
+    }
+  }, [visibleCandles, stratKey, params, paramError, rangeWarn, S, stopPct, takePct, stake, compound])
 
   const handleStratChange = key => {
     setStratKey(key)
@@ -163,6 +168,10 @@ export default function App() {
           takePct={takePct}
           onStopChange={setStopPct}
           onTakeChange={setTakePct}
+          stake={stake}
+          compound={compound}
+          onStakeChange={setStake}
+          onCompoundChange={setCompound}
           onReload={() => cargarKraken()}
           loading={loading}
         />
@@ -171,7 +180,7 @@ export default function App() {
         {rangeWarn && <div className="warn">{rangeWarn}</div>}
         {loadError && <div className="warn">{loadError}</div>}
 
-        {result && <KPIs met={result.met} />}
+        {result && <KPIs met={result.met} stake={stake} />}
 
         <section className="chartblock">
           <div className="chead">
@@ -194,7 +203,10 @@ export default function App() {
 
         <section className="chartblock">
           <div className="chead">
-            <div className="label">Your money over time · $1,000 invested</div>
+            <div className="label">
+              Your money over time · ${stake.toLocaleString('en-US')} invested
+              {!compound && <span style={{ color: 'var(--mute)', fontWeight: 400 }}> · fixed size per trade</span>}
+            </div>
             <div className="legend">
               <span><span className="sw" style={{ background: 'var(--accent)' }}></span>With the strategy</span>
               <span><span className="sw" style={{ background: 'var(--mute)' }}></span>Buy and hold</span>
@@ -205,6 +217,7 @@ export default function App() {
               eqArr={result.eqArr}
               bhArr={result.bhArr}
               candles={visibleCandles}
+              stake={stake}
             />
           )}
         </section>

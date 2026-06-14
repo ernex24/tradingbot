@@ -126,10 +126,7 @@ function BotCard({ bot, onToggle, onDelete }) {
       <div className="bot-head">
         <div>
           <div className="bot-name">
-            {bot.name}{' '}
-            {config.executor === 'binance-testnet'
-              ? <span className="tag tag-testnet">LIVE TESTNET</span>
-              : <span className="tag tag-open">PAPER</span>}
+            {bot.name} <span className="tag tag-testnet">LIVE TESTNET</span>
           </div>
           <div className="bot-meta">
             {coin.symbol} · {config.interval} · {S.nombre} · {config.effectiveDirection}

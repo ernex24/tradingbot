@@ -2,7 +2,11 @@
 // paginating /api/v3/klines via endTime. Public market data only.
 
 const BINANCE_SYMBOLS = {
-  BTC: 'BTCUSDT', ETH: 'ETHUSDT', SOL: 'SOLUSDT', SUI: 'SUIUSDT',
+  BTC: 'BTCUSDT', ETH: 'ETHUSDT', BNB: 'BNBUSDT', SOL: 'SOLUSDT',
+  XRP: 'XRPUSDT', ADA: 'ADAUSDT', DOGE: 'DOGEUSDT', LTC: 'LTCUSDT',
+  LINK: 'LINKUSDT', DOT: 'DOTUSDT', AVAX: 'AVAXUSDT', TRX: 'TRXUSDT',
+  ATOM: 'ATOMUSDT', NEAR: 'NEARUSDT', SUI: 'SUIUSDT', APT: 'APTUSDT',
+  INJ: 'INJUSDT', TIA: 'TIAUSDT',
 }
 const ALLOWED_INTERVALS = ['5m', '15m', '1h', '4h', '1d']
 const TARGET_CANDLES = 3000

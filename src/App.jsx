@@ -3,7 +3,7 @@ import { DEMO_CANDLES } from './lib/demoData.js'
 import { STRATS } from './lib/strategies.js'
 import { backtest } from './lib/backtest.js'
 import { coinByPair } from './lib/coins.js'
-import { createInitialState, tick as paperTick } from './lib/paperTrader.js'
+import { createInitialState } from './lib/paperTrader.js'
 import { executeTick as binanceTick, executorSupportsCoin } from './lib/binanceExecutor.js'
 import { binanceStream } from './lib/binanceStream.js'
 import Tabs from './components/Tabs.jsx'
@@ -21,7 +21,9 @@ const POLL_MS = 30000
 function loadBots() {
   try {
     const raw = localStorage.getItem(BOTS_STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
+    const list = raw ? JSON.parse(raw) : []
+    // Drop the old paper bots — only live Testnet bots are supported now.
+    return list.filter(b => b.config?.executor === 'binance-testnet')
   } catch { return [] }
 }
 function saveBots(bots) {
@@ -174,9 +176,9 @@ export default function App() {
 
   const currentConfigLabel = `${coin.symbol} · ${S.nombre} · ${effectiveDirection}`
 
-  const handleCreateBot = (executor = 'paper') => {
+  const handleCreateBot = () => {
     const id = newId()
-    const baseName = currentConfigLabel + (executor === 'binance-testnet' ? ' · LIVE' : '')
+    const baseName = currentConfigLabel
     const sameNameCount = bots.filter(b => b.name.startsWith(baseName)).length
     const name = sameNameCount > 0 ? `${baseName} #${sameNameCount + 1}` : baseName
     const bot = {
@@ -192,7 +194,7 @@ export default function App() {
         effectiveDirection,
         stopPct, takePct,
         stake, compound,
-        executor,
+        executor: 'binance-testnet',
       },
       state: createInitialState(stake),
     }
@@ -274,11 +276,7 @@ export default function App() {
       }
       let next
       try {
-        if (cfg.executor === 'binance-testnet') {
-          next = await binanceTick(bot.state, signal, last.c, last, Date.now(), opts)
-        } else {
-          next = paperTick(bot.state, signal, last.c, last, Date.now(), opts)
-        }
+        next = await binanceTick(bot.state, signal, last.c, last, Date.now(), opts)
       } catch (e) {
         console.warn(`bot ${bot.name} executor error:`, e?.message || e)
         next = {
@@ -431,31 +429,23 @@ export default function App() {
               <button
                 type="button"
                 className="btn"
-                onClick={() => handleCreateBot('paper')}
-                disabled={!!paramError || !!rangeWarn}
-                title={(paramError || rangeWarn) ? 'Fix the warnings before saving' : 'Save this config as a paper bot'}
-              >
-                + Save as paper bot
-              </button>
-              <button
-                type="button"
-                className="btn"
-                style={{ marginLeft: 8, background: '#166534', borderColor: '#166534' }}
-                onClick={() => handleCreateBot('binance-testnet')}
+                style={{ background: '#166534', borderColor: '#166534' }}
+                onClick={handleCreateBot}
                 disabled={
                   !!paramError || !!rangeWarn ||
                   !executorSupportsCoin(coin.symbol) ||
                   effectiveDirection !== 'long'
                 }
                 title={
+                  paramError || rangeWarn ? 'Fix the warnings first' :
                   !executorSupportsCoin(coin.symbol)
-                    ? 'This coin is not available on Binance Spot Testnet'
+                    ? `${coin.symbol} is backtest-only — not available on Binance Spot Testnet`
                     : effectiveDirection !== 'long'
                       ? 'Binance Spot Testnet only supports long positions'
-                      : 'Save this config as a LIVE Testnet bot — executes real orders on Binance Testnet'
+                      : 'Execute this strategy live against Binance Testnet'
                 }
               >
-                + Save as Testnet bot
+                + Create live Testnet bot
               </button>
               <span style={{ color: 'var(--mute)', fontSize: 13, marginLeft: 12 }}>
                 Will be named: <b>{currentConfigLabel}</b>

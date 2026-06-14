@@ -3,10 +3,11 @@
 // Auto-reconnects on disconnect.
 
 const BINANCE_SYMBOLS = {
-  BTC: 'btcusdt',
-  ETH: 'ethusdt',
-  SOL: 'solusdt',
-  SUI: 'suiusdt',
+  BTC: 'btcusdt', ETH: 'ethusdt', BNB: 'bnbusdt', SOL: 'solusdt',
+  XRP: 'xrpusdt', ADA: 'adausdt', DOGE: 'dogeusdt', LTC: 'ltcusdt',
+  LINK: 'linkusdt', DOT: 'dotusdt', AVAX: 'avaxusdt', TRX: 'trxusdt',
+  ATOM: 'atomusdt', NEAR: 'nearusdt', SUI: 'suiusdt', APT: 'aptusdt',
+  INJ: 'injusdt', TIA: 'tiausdt',
 }
 
 class BinanceStreamManager {

@@ -16,7 +16,7 @@ function defaultParams(stratKey) {
 
 export default function App() {
   const [candles, setCandles] = useState(DEMO_CANDLES)
-  const [dataSrc, setDataSrc] = useState('datos de demostración')
+  const [dataSrc, setDataSrc] = useState('demo data')
   const [updatedAt, setUpdatedAt] = useState('')
   const [stratKey, setStratKey] = useState('ma')
   const [params, setParams] = useState(() => defaultParams('ma'))
@@ -46,9 +46,9 @@ export default function App() {
 
   let rangeWarn = ''
   if (desde && hasta && desde > hasta) {
-    rangeWarn = 'La fecha "Desde" es posterior a la fecha "Hasta".'
+    rangeWarn = '"From" date is later than "To" date.'
   } else if (visibleCandles.length < 30) {
-    rangeWarn = `Solo ${visibleCandles.length} velas en el rango — necesitas más datos para un backtest útil.`
+    rangeWarn = `Only ${visibleCandles.length} candles in range — need more data for a meaningful backtest.`
   }
 
   const result = useMemo(() => {
@@ -94,12 +94,12 @@ export default function App() {
         c: Math.round(+row[4]),
       }))
       setCandles(next)
-      setDataSrc('datos en vivo · Kraken')
-      setUpdatedAt('Act. ' + new Date().toLocaleString('es-ES'))
+      setDataSrc('live data · Kraken')
+      setUpdatedAt('Updated ' + new Date().toLocaleString('en-US'))
     } catch (e) {
-      console.warn('Kraken fetch falló:', e)
-      setLoadError('No se pudieron cargar datos en vivo (' + e.message + '). Usando demostración.')
-      setDataSrc('Kraken no disponible — usando demostración')
+      console.warn('Kraken fetch failed:', e)
+      setLoadError('Could not load live data (' + e.message + '). Using demo.')
+      setDataSrc('Kraken unavailable — using demo')
     } finally {
       setLoading(false)
     }
@@ -114,7 +114,7 @@ export default function App() {
     <>
       <div className="safebar">
         <span className="dot"></span>
-        Modo seguro · el bot no envía órdenes reales
+        Safe mode · the bot does not place real orders
         <span className="datasrc">{dataSrc}</span>
       </div>
 
@@ -150,12 +150,12 @@ export default function App() {
 
         <section className="chartblock">
           <div className="chead">
-            <div className="label">Velas, medias y operaciones</div>
+            <div className="label">Candles, moving averages and trades</div>
             <div className="legend">
               <span><span className="sw" style={{ background: 'var(--accent)' }}></span>{l1}</span>
               <span><span className="sw" style={{ background: '#9aa0a6' }}></span>{l2}</span>
-              <span><span className="tri-up"></span>Compra</span>
-              <span><span className="tri-dn"></span>Venta</span>
+              <span><span className="tri-up"></span>Buy</span>
+              <span><span className="tri-dn"></span>Sell</span>
             </div>
           </div>
           {result && (
@@ -169,10 +169,10 @@ export default function App() {
 
         <section className="chartblock">
           <div className="chead">
-            <div className="label">Tu dinero en el tiempo · $1,000 invertidos</div>
+            <div className="label">Your money over time · $1,000 invested</div>
             <div className="legend">
-              <span><span className="sw" style={{ background: 'var(--accent)' }}></span>Con la estrategia</span>
-              <span><span className="sw" style={{ background: 'var(--mute)' }}></span>Si solo compras y aguantas</span>
+              <span><span className="sw" style={{ background: 'var(--accent)' }}></span>With the strategy</span>
+              <span><span className="sw" style={{ background: 'var(--mute)' }}></span>Buy and hold</span>
             </div>
           </div>
           {result && (
@@ -187,8 +187,8 @@ export default function App() {
         {result && <TradeTable trades={result.trades} />}
 
         <footer>
-          Herramienta de investigación, no asesoramiento financiero. Las cifras de demostración
-          no predicen rendimiento futuro. Orden correcto: backtest → paper trading → capital real y mínimo.
+          Research tool, not financial advice. Demo figures do not predict future performance.
+          Correct order: backtest → paper trading → real capital, and start small.
         </footer>
       </div>
     </>

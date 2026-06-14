@@ -8,35 +8,35 @@ export default function KPIs({ met }) {
   return (
     <section className="kpis">
       <div className="kpi-main">
-        <div className="label">Resultado con la estrategia</div>
+        <div className="label">Strategy result</div>
         <div className={`big num ${met.total >= 0 ? 'pos' : 'neg'}`}>{pct(met.total)}</div>
         <div className="story">
-          Invertiste <b>{usd(STAKE)}</b> → ahora tendrías <b>{usd(finalVal)}</b>{' '}
+          You invested <b>{usd(STAKE)}</b> → you'd now have <b>{usd(finalVal)}</b>{' '}
           <span className="num">({signed(ganancia)})</span>
         </div>
         <div className="story" style={{ fontSize: 14, marginTop: 6 }}>
-          Solo comprar y aguantar habría dado {pct(met.bhTotal)}.
+          Buy and hold would have returned {pct(met.bhTotal)}.
         </div>
       </div>
 
       <div className="kpi">
-        <div className="label">Operaciones</div>
+        <div className="label">Trades</div>
         <div className="num-md num">{met.n}</div>
         <div className="sub">
-          <span className="pill win">{met.ganadores} ganadas</span>
-          <span className="pill loss">{met.n - met.ganadores} perdidas</span>
+          <span className="pill win">{met.ganadores} wins</span>
+          <span className="pill loss">{met.n - met.ganadores} losses</span>
         </div>
       </div>
 
       <div className="kpi">
-        <div className="label">Mejor / peor operación</div>
+        <div className="label">Best / worst trade</div>
         <div className="num-md num">
           <span style={{ color: 'var(--pos)' }}>{pct(met.mejor)}</span>{' '}
           <span style={{ color: 'var(--mute)', fontWeight: 400 }}>/</span>{' '}
           <span style={{ color: 'var(--neg)' }}>{pct(met.peor)}</span>
         </div>
         <div className="sub">
-          En mercado {met.enMercado.toFixed(0)}% del tiempo · peor caída {met.maxdd.toFixed(0)}%
+          In market {met.enMercado.toFixed(0)}% of the time · worst drawdown {met.maxdd.toFixed(0)}%
         </div>
       </div>
     </section>

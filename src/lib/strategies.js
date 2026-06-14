@@ -2,14 +2,14 @@ import { sma, rsi } from './indicators.js'
 
 export const STRATS = {
   ma: {
-    nombre: 'Cruce de medias',
+    nombre: 'Moving average cross',
     params: [
-      { k: 'corta', label: 'Media corta', def: 10, min: 2, max: 100 },
-      { k: 'larga', label: 'Media larga', def: 30, min: 5, max: 200 },
+      { k: 'corta', label: 'Short MA', def: 10, min: 2, max: 100 },
+      { k: 'larga', label: 'Long MA', def: 30, min: 5, max: 200 },
     ],
     leyenda: p => ['MA' + p.corta, 'MA' + p.larga],
     validar: p => (p.corta >= p.larga
-      ? 'La media corta debe ser menor que la larga.'
+      ? 'Short MA must be smaller than long MA.'
       : null),
     run: (c, p) => {
       const close = c.map(x => x.c)
@@ -23,15 +23,15 @@ export const STRATS = {
   },
 
   rsi: {
-    nombre: 'RSI · reversión',
+    nombre: 'RSI · mean reversion',
     params: [
-      { k: 'periodo', label: 'Periodo RSI', def: 14, min: 2, max: 50 },
-      { k: 'compra', label: 'Compra bajo', def: 35, min: 5, max: 50 },
-      { k: 'venta', label: 'Vende sobre', def: 55, min: 50, max: 95 },
+      { k: 'periodo', label: 'RSI period', def: 14, min: 2, max: 50 },
+      { k: 'compra', label: 'Buy below', def: 35, min: 5, max: 50 },
+      { k: 'venta', label: 'Sell above', def: 55, min: 50, max: 95 },
     ],
-    leyenda: () => ['Precio', '—'],
+    leyenda: () => ['Price', '—'],
     validar: p => (p.compra >= p.venta
-      ? 'El umbral de compra debe ser menor que el de venta.'
+      ? 'Buy threshold must be lower than sell threshold.'
       : null),
     run: (c, p) => {
       const close = c.map(x => x.c)
@@ -55,11 +55,11 @@ export const STRATS = {
   },
 
   brk: {
-    nombre: 'Ruptura',
+    nombre: 'Breakout',
     params: [
-      { k: 'lookback', label: 'Ventana', def: 20, min: 5, max: 80 },
+      { k: 'lookback', label: 'Lookback', def: 20, min: 5, max: 80 },
     ],
-    leyenda: p => ['Máx ' + p.lookback, 'Mín ' + p.lookback],
+    leyenda: p => ['High ' + p.lookback, 'Low ' + p.lookback],
     validar: () => null,
     run: (c, p) => {
       const close = c.map(x => x.c)
@@ -84,9 +84,9 @@ export const STRATS = {
   },
 
   hold: {
-    nombre: 'Comprar y mantener',
+    nombre: 'Buy and hold',
     params: [],
-    leyenda: () => ['Precio', '—'],
+    leyenda: () => ['Price', '—'],
     validar: () => null,
     run: c => ({
       pos: new Array(c.length).fill(1),

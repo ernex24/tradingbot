@@ -10,7 +10,7 @@ export default function Controls({
   return (
     <section className="controls">
       <div className="ctl">
-        <label htmlFor="strat">Estrategia</label>
+        <label htmlFor="strat">Strategy</label>
         <select
           id="strat"
           value={stratKey}
@@ -23,10 +23,10 @@ export default function Controls({
       </div>
 
       <div className="ctl">
-        <label>Parámetros</label>
+        <label>Parameters</label>
         <div className="params">
           {S.params.length === 0
-            ? <span className="empty">— sin parámetros —</span>
+            ? <span className="empty">— no parameters —</span>
             : S.params.map(p => (
               <div className="pfield" key={p.k}>
                 <span>{p.label}</span>
@@ -47,10 +47,10 @@ export default function Controls({
       </div>
 
       <div className="ctl">
-        <label>Rango de fechas</label>
+        <label>Date range</label>
         <div className="params">
           <div className="pfield">
-            <span>Desde</span>
+            <span>From</span>
             <input
               type="date"
               value={desde}
@@ -60,7 +60,7 @@ export default function Controls({
             />
           </div>
           <div className="pfield">
-            <span>Hasta</span>
+            <span>To</span>
             <input
               type="date"
               value={hasta}
@@ -75,9 +75,9 @@ export default function Controls({
               type="button"
               className="btn-ghost"
               onClick={onResetRange}
-              title="Usar todo el periodo disponible"
+              title="Use the entire available period"
             >
-              Todo
+              All
             </button>
           </div>
         </div>
@@ -86,7 +86,7 @@ export default function Controls({
       <div className="ctl">
         <label>&nbsp;</label>
         <button className="btn" onClick={onReload} disabled={loading}>
-          {loading ? 'Cargando…' : 'Cargar datos en vivo'}
+          {loading ? 'Loading…' : 'Load live data'}
         </button>
       </div>
     </section>

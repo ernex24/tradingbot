@@ -6,7 +6,7 @@ export default function TradeTable({ trades }) {
     return (
       <section className="tradeblock">
         <div className="label" style={{ marginBottom: 'var(--s3)' }}>
-          Cada operación: cuándo compré, cuándo vendí, cuánto gané o perdí
+          Every trade: when bought, when sold, profit or loss
         </div>
         <table>
           <colgroup>
@@ -18,15 +18,15 @@ export default function TradeTable({ trades }) {
           </colgroup>
           <thead>
             <tr>
-              <th>#</th><th>Compré</th><th>Vendí</th>
-              <th className="r">Resultado (neto)</th>
-              <th className="r">Sobre $1,000</th>
+              <th>#</th><th>Bought</th><th>Sold</th>
+              <th className="r">Result (net)</th>
+              <th className="r">On $1,000</th>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td colSpan="5" style={{ color: 'var(--mute)' }}>
-                Esta estrategia no hizo ninguna operación en el periodo.
+                This strategy made no trades in the period.
               </td>
             </tr>
           </tbody>
@@ -38,7 +38,7 @@ export default function TradeTable({ trades }) {
   return (
     <section className="tradeblock">
       <div className="label" style={{ marginBottom: 'var(--s3)' }}>
-        Cada operación: cuándo compré, cuándo vendí, cuánto gané o perdí
+        Every trade: when bought, when sold, profit or loss
       </div>
       <table>
         <colgroup>
@@ -50,9 +50,9 @@ export default function TradeTable({ trades }) {
         </colgroup>
         <thead>
           <tr>
-            <th>#</th><th>Compré</th><th>Vendí</th>
-            <th className="r">Resultado (neto)</th>
-            <th className="r">Sobre $1,000</th>
+            <th>#</th><th>Bought</th><th>Sold</th>
+            <th className="r">Result (net)</th>
+            <th className="r">On $1,000</th>
           </tr>
         </thead>
         <tbody>
@@ -66,7 +66,7 @@ export default function TradeTable({ trades }) {
                 <td className="num">
                   {t.vf
                     ? `${t.vf} · ${usd(t.vp)}`
-                    : <span style={{ color: 'var(--mute)' }}>posición abierta · {usd(t.vp)}</span>}
+                    : <span style={{ color: 'var(--mute)' }}>open position · {usd(t.vp)}</span>}
                 </td>
                 <td className={`r res num ${cls}`}>{pct(t.retNet)}</td>
                 <td className={`r res num ${cls}`}>{signed(dollar)}</td>
@@ -76,9 +76,9 @@ export default function TradeTable({ trades }) {
         </tbody>
       </table>
       <div className="tnote">
-        Resultado neto = ya descontadas las comisiones de entrada y salida (0,16% cada lado).
-        La columna "Sobre $1,000" muestra cuánto habrías ganado o perdido si pusieras $1,000
-        en cada operación por separado (sin reinvertir).
+        Net result = entry and exit commissions already subtracted (0.16% each side).
+        The "On $1,000" column shows how much you would have made or lost if you put $1,000
+        on each trade separately (no compounding).
       </div>
     </section>
   )

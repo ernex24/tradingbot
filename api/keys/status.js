@@ -1,6 +1,6 @@
 // GET /api/keys/status
 // Requires Authorization: Bearer <Supabase JWT>.
-// Returns { keys: [{ exchange, keyHint, permissions, createdAt, lastUsedAt }] }.
+// Returns { keys: [{ exchange, testnet, keyHint, permissions, createdAt, lastUsedAt }] }.
 // Never returns the actual key or secret — only metadata.
 
 import { getAdminClient, requireUser, jsonResponse } from '../_lib/supabaseServer.js'
@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   const admin = getAdminClient()
   const { data, error } = await admin
     .from('user_exchange_keys')
-    .select('exchange, key_hint, permissions, created_at, last_used_at')
+    .select('exchange, testnet, key_hint, permissions, created_at, last_used_at')
     .eq('user_id', user.user_id)
 
   if (error) {
@@ -28,6 +28,7 @@ export default async function handler(req, res) {
   return jsonResponse(res, 200, {
     keys: (data || []).map(row => ({
       exchange: row.exchange,
+      testnet: !!row.testnet,
       keyHint: row.key_hint,
       permissions: row.permissions || [],
       createdAt: row.created_at,

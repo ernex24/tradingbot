@@ -1,7 +1,6 @@
 // POST /api/keys/delete
-// Body: { exchange }
+// Body: { exchange, testnet }
 // Requires Authorization: Bearer <Supabase JWT>.
-// Removes the encrypted row for this user + exchange. Disconnect button uses this.
 
 import { getAdminClient, requireUser, jsonResponse } from '../_lib/supabaseServer.js'
 
@@ -14,7 +13,7 @@ export default async function handler(req, res) {
   try { user = await requireUser(req) }
   catch { return jsonResponse(res, 401, { error: 'unauthorized' }) }
 
-  const { exchange } = req.body || {}
+  const { exchange, testnet } = req.body || {}
   if (!exchange) {
     return jsonResponse(res, 400, { error: 'missing exchange' })
   }
@@ -25,11 +24,12 @@ export default async function handler(req, res) {
     .delete()
     .eq('user_id', user.user_id)
     .eq('exchange', exchange)
+    .eq('testnet', !!testnet)
 
   if (error) {
     console.error('keys/delete db error:', error)
     return jsonResponse(res, 500, { error: 'failed to delete' })
   }
 
-  return jsonResponse(res, 200, { deleted: true, exchange })
+  return jsonResponse(res, 200, { deleted: true, exchange, testnet: !!testnet })
 }

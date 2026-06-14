@@ -175,6 +175,105 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Closed-trade persistence ----------------------------------------
+  // localStorage is the working copy. On every state change, mirror
+  // any new closed trades to Supabase. On auth ready, pull any DB
+  // trades the browser doesn't already have. Tracked-as-saved set lives
+  // in a ref so the effect can dedupe across renders.
+  const savedTradeKeys = useRef(new Set())
+
+  useEffect(() => {
+    if (!supabase) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session || cancelled) return
+        const toSave = []
+        for (const bot of bots) {
+          for (const t of bot.state.closedTrades) {
+            const key = `${bot.id}|${t.entryTime}|${t.exitTime}`
+            if (savedTradeKeys.current.has(key)) continue
+            savedTradeKeys.current.add(key)
+            toSave.push({ bot, trade: t, key })
+          }
+        }
+        if (!toSave.length) return
+        await Promise.all(toSave.map(async ({ bot, trade, key }) => {
+          try {
+            const r = await authFetch('/api/trades/save', {
+              method: 'POST',
+              body: JSON.stringify({
+                botId: bot.id,
+                botName: bot.name,
+                symbol: bot.config.pair,
+                side: trade.side,
+                testnet: bot.config.executor === 'binance-testnet',
+                entryTime: trade.entryTime,
+                entryPrice: trade.entryPrice,
+                qty: trade.qty,
+                invested: trade.invested,
+                exitTime: trade.exitTime,
+                exitPrice: trade.exitPrice,
+                pnlUSD: trade.pnlUSD,
+                netPct: trade.netPct,
+                feeUSD: trade.feeUSD ?? 0,
+                reason: trade.reason,
+                entryOrderId: trade.entryOrderId,
+                exitOrderId: trade.exitOrderId,
+              }),
+            })
+            if (!r.ok) savedTradeKeys.current.delete(key)
+          } catch {
+            savedTradeKeys.current.delete(key)
+          }
+        }))
+      } catch { /* ignore */ }
+    })()
+    return () => { cancelled = true }
+  }, [bots])
+
+  useEffect(() => {
+    if (!supabase) return
+    let cancelled = false
+    const load = async (session) => {
+      if (!session) return
+      try {
+        const r = await authFetch('/api/trades/list')
+        if (!r.ok) return
+        const { trades = [] } = await r.json()
+        if (cancelled || !trades.length) return
+        const byBot = new Map()
+        for (const t of trades) {
+          const key = `${t.botId}|${t.entryTime}|${t.exitTime}`
+          savedTradeKeys.current.add(key)
+          const list = byBot.get(t.botId) || []
+          list.push(t)
+          byBot.set(t.botId, list)
+        }
+        setBots(prev => prev.map(b => {
+          const dbTrades = byBot.get(b.id)
+          if (!dbTrades) return b
+          const seen = new Set()
+          const merged = []
+          const push = (t) => {
+            const k = `${t.entryTime}|${t.exitTime}`
+            if (seen.has(k)) return
+            seen.add(k)
+            merged.push(t)
+          }
+          dbTrades.forEach(push)
+          b.state.closedTrades.forEach(push)
+          merged.sort((a, b) => (a.entryTime || 0) - (b.entryTime || 0))
+          return { ...b, state: { ...b.state, closedTrades: merged } }
+        }))
+      } catch { /* ignore */ }
+    }
+    supabase.auth.getSession().then(({ data }) => load(data.session))
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => load(s))
+    return () => { cancelled = true; sub?.subscription?.unsubscribe?.() }
+  }, [])
+
   // USDT balance polling --------------------------------------------
   // Pulls the user's real Binance Testnet USDT balance every 60s when
   // signed in. Silent on auth/network failure; the header just shows "—".

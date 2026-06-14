@@ -109,13 +109,15 @@ function buildChartData(bot) {
   return { recent, lines, trades }
 }
 
-function OpenPositionSummary({ bot, coin, onCloseOpen }) {
+function OpenPositionsTable({ bot, coin, onCloseOpen }) {
   const op = bot.state.openPosition
   const [closing, setClosing] = useState(false)
   if (!op) return null
   const live = bot.state.lastPrice
   const fp = live ? floatingPnL(op, live) : 0
-  const total = op.invested + fp
+  const floatPct = op.invested > 0 ? (fp / op.invested) * 100 : 0
+  const entryFee = op.invested * COM
+  const cls = fp >= 0 ? 'pos' : 'neg'
 
   const handleClose = async () => {
     if (closing) return
@@ -131,22 +133,9 @@ function OpenPositionSummary({ bot, coin, onCloseOpen }) {
   }
 
   return (
-    <div className="open-summary">
-      <div className="open-summary-main">
-        <div>
-          <span className="tag tag-open-pos">OPEN</span>{' '}
-          {sideTag(op.side)}{' '}
-          <b>{fmtQty(op.qty, coin.symbol)}</b>{' '}
-          · entry {price(op.entryPrice)}
-          {live && (
-            <>
-              {' '}· live {price(live)}{' '}
-              <span className={fp >= 0 ? 'pos' : 'neg'}>
-                ({signed(fp)} → {usdPrecise(total)})
-              </span>
-            </>
-          )}
-        </div>
+    <div className="bot-trades">
+      <div className="bot-trades-head">
+        <div className="label">Open position</div>
         <button
           type="button"
           className="btn-ghost btn-danger btn-close-now"
@@ -154,13 +143,52 @@ function OpenPositionSummary({ bot, coin, onCloseOpen }) {
           disabled={closing || !onCloseOpen}
           title="Send a MARKET SELL to Binance Testnet for the full position quantity"
         >
-          {closing ? 'Selling…' : 'Close now'}
+          {closing ? 'Selling…' : `Close ${fmtQty(op.qty, coin.symbol)} now`}
         </button>
       </div>
-      <div className="open-summary-sub">
-        SL {op.slPrice ? price(op.slPrice) : 'off'}
-        {' · TP '}{op.tpPrice ? price(op.tpPrice) : 'off'}
-        {' · invested '}{usdPrecise(op.invested)}
+      <div className="bot-trades-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Side</th>
+              <th>Bought</th>
+              <th>Live · SL/TP</th>
+              <th className="r">Result</th>
+              <th className="r">Fees</th>
+              <th className="r">Floating P&amp;L</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="row-open">
+              <td><span className="tag tag-open-pos">OPEN</span></td>
+              <td>{sideTag(op.side)}</td>
+              <td className="num">
+                {timestamp(op.entryTime)} · {price(op.entryPrice)}
+                <div style={{ color: 'var(--mute)', fontSize: 11 }}>
+                  {fmtQty(op.qty, coin.symbol)} for {usdPrecise(op.invested)}
+                </div>
+              </td>
+              <td className="num">
+                {live ? price(live) : '—'}
+                <div style={{ color: 'var(--mute)', fontSize: 11 }}>
+                  SL {op.slPrice ? price(op.slPrice) : 'off'} · TP {op.tpPrice ? price(op.tpPrice) : 'off'}
+                </div>
+              </td>
+              <td className={`r num ${cls}`}>{pct(floatPct)}</td>
+              <td className="r num" style={{ color: 'var(--mute)' }}>
+                {usdPrecise(entryFee)}
+                <div style={{ fontSize: 11 }}>1 side</div>
+              </td>
+              <td className={`r num ${cls}`}>
+                {signed(fp)}
+                <div style={{ color: 'var(--mute)', fontSize: 11, fontWeight: 400 }}>
+                  → {usdPrecise(op.invested + fp)}
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   )
@@ -529,7 +557,7 @@ function BotCard({ bot, onToggle, onDelete, onCloseBotPosition }) {
         </div>
       </div>
 
-      <OpenPositionSummary bot={bot} coin={coin} onCloseOpen={onCloseBotPosition} />
+      <OpenPositionsTable bot={bot} coin={coin} onCloseOpen={onCloseBotPosition} />
 
       <div className="bot-accordion">
         <button

@@ -2,6 +2,7 @@ import { STRATS } from '../lib/strategies.js'
 
 export default function Controls({
   stratKey, params, onStratChange, onParamChange,
+  desde, hasta, minDate, maxDate, onDateChange, onResetRange,
   onReload, loading,
 }) {
   const S = STRATS[stratKey]
@@ -42,6 +43,43 @@ export default function Controls({
                 />
               </div>
             ))}
+        </div>
+      </div>
+
+      <div className="ctl">
+        <label>Rango de fechas</label>
+        <div className="params">
+          <div className="pfield">
+            <span>Desde</span>
+            <input
+              type="date"
+              value={desde}
+              min={minDate}
+              max={maxDate}
+              onChange={e => onDateChange('desde', e.target.value)}
+            />
+          </div>
+          <div className="pfield">
+            <span>Hasta</span>
+            <input
+              type="date"
+              value={hasta}
+              min={minDate}
+              max={maxDate}
+              onChange={e => onDateChange('hasta', e.target.value)}
+            />
+          </div>
+          <div className="pfield">
+            <span>&nbsp;</span>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={onResetRange}
+              title="Usar todo el periodo disponible"
+            >
+              Todo
+            </button>
+          </div>
         </div>
       </div>
 

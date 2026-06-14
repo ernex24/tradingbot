@@ -1,6 +1,8 @@
+import { shortDate, tickIndices } from '../lib/axis.js'
+
 const W = 1180
-const H = 360
-const PAD = { t: 14, r: 8, b: 8, l: 8 }
+const H = 380
+const PAD = { t: 14, r: 8, b: 32, l: 8 }
 
 function linePath(arr, X, Y) {
   let d = ''
@@ -25,6 +27,8 @@ export default function PriceChart({ candles, lines, trades }) {
   const X = i => PAD.l + (i + 0.5) / n * (W - PAD.l - PAD.r)
   const Y = v => PAD.t + (1 - (v - (min - padv)) / ((max + padv) - (min - padv))) * (H - PAD.t - PAD.b)
   const cw = Math.max(1.5, (W - PAD.l - PAD.r) / n * 0.62)
+  const axisY = H - PAD.b + 4
+  const ticks = tickIndices(n, 7)
 
   return (
     <svg className="svg-price" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
@@ -62,16 +66,42 @@ export default function PriceChart({ candles, lines, trades }) {
       )}
       {trades.map((t, k) => {
         const xb = X(t.ci), yb = Y(t.cp)
-        const buy = <path d={`M${xb} ${yb + 16} l-6 11 l12 0 z`} fill="#1b7a4b" />
+        const buy = (
+          <g>
+            <path d={`M${xb} ${yb + 16} l-6 11 l12 0 z`} fill="#1b7a4b" />
+            <text x={xb} y={yb + 41} textAnchor="middle" fontSize="9"
+              fontFamily="var(--font, sans-serif)" fill="#1b7a4b">
+              {shortDate(candles[t.ci]?.f)}
+            </text>
+          </g>
+        )
         if (t.vi == null) return <g key={`m-${k}`}>{buy}</g>
         const xs = X(t.vi), ys = Y(t.vp)
         return (
           <g key={`m-${k}`}>
             {buy}
             <path d={`M${xs} ${ys - 16} l-6 -11 l12 0 z`} fill="#c0392b" />
+            <text x={xs} y={ys - 32} textAnchor="middle" fontSize="9"
+              fontFamily="var(--font, sans-serif)" fill="#c0392b">
+              {shortDate(candles[t.vi]?.f)}
+            </text>
           </g>
         )
       })}
+
+      {/* x-axis baseline */}
+      <line x1={PAD.l} y1={H - PAD.b} x2={W - PAD.r} y2={H - PAD.b}
+        stroke="#e5e5e5" strokeWidth="1" />
+      {ticks.map(i => (
+        <g key={`tk-${i}`}>
+          <line x1={X(i)} y1={H - PAD.b} x2={X(i)} y2={H - PAD.b + 4}
+            stroke="#9aa0a6" strokeWidth="1" />
+          <text x={X(i)} y={axisY + 12} textAnchor="middle" fontSize="11"
+            fontFamily="var(--font, sans-serif)" fill="#6b6b6b">
+            {shortDate(candles[i]?.f)}
+          </text>
+        </g>
+      ))}
     </svg>
   )
 }

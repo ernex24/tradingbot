@@ -98,6 +98,26 @@ input[type=number] { width: 84px; }
   cursor: pointer;
 }
 .btn[disabled] { opacity: 0.6; cursor: not-allowed; }
+.btn-ghost {
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.btn-ghost:hover { background: var(--subtle); }
+input[type=date] {
+  font-family: var(--font);
+  font-size: 14px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 2px;
+}
 
 .warn {
   background: #fef6e7;
@@ -172,8 +192,8 @@ input[type=number] { width: 84px; }
   display: inline-block;
 }
 svg { width: 100%; display: block; }
-.svg-price { height: 360px; }
-.svg-equity { height: 200px; }
+.svg-price { height: 380px; }
+.svg-equity { height: 220px; }
 
 .tradeblock { padding: var(--s5) 0 var(--s7); }
 table {
@@ -212,7 +232,7 @@ footer {
 @media (max-width: 760px) {
   .kpis { grid-template-columns: 1fr; gap: var(--s4); }
   .kpi-main .big { font-size: 40px; }
-  .svg-price { height: 280px; }
-  .svg-equity { height: 170px; }
+  .svg-price { height: 300px; }
+  .svg-equity { height: 190px; }
   select { min-width: 150px; }
 }

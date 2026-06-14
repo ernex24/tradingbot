@@ -10,6 +10,7 @@ export default function Controls({
   stratKey, params, onStratChange, onParamChange,
   interval, onIntervalChange,
   desde, hasta, minDate, maxDate, onDateChange, onResetRange,
+  stopPct, takePct, onStopChange, onTakeChange,
   onReload, loading,
 }) {
   const S = STRATS[stratKey]
@@ -64,6 +65,40 @@ export default function Controls({
                 />
               </div>
             ))}
+        </div>
+      </div>
+
+      <div className="ctl">
+        <label>Risk (% from entry, 0 = off)</label>
+        <div className="params">
+          <div className="pfield">
+            <span>Stop loss</span>
+            <input
+              type="number"
+              value={stopPct}
+              min={0}
+              max={50}
+              step="0.1"
+              onChange={e => {
+                const v = +e.target.value
+                onStopChange(Math.max(0, Math.min(50, Number.isFinite(v) ? v : 0)))
+              }}
+            />
+          </div>
+          <div className="pfield">
+            <span>Take profit</span>
+            <input
+              type="number"
+              value={takePct}
+              min={0}
+              max={500}
+              step="0.1"
+              onChange={e => {
+                const v = +e.target.value
+                onTakeChange(Math.max(0, Math.min(500, Number.isFinite(v) ? v : 0)))
+              }}
+            />
+          </div>
         </div>
       </div>
 

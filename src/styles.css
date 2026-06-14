@@ -158,6 +158,21 @@ input[type=date] {
 .pill.win { background: #e8f3ec; color: var(--pos); }
 .pill.loss { background: #f7e9e8; color: var(--neg); }
 
+.tag {
+  display: inline-block;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 2px;
+  margin-left: 6px;
+  font-weight: 600;
+  vertical-align: 1px;
+}
+.tag-sl { background: #f7e9e8; color: var(--neg); }
+.tag-tp { background: #e8f3ec; color: var(--pos); }
+.tag-open { background: #eef1f4; color: var(--mute); }
+
 .chartblock {
   padding: var(--s5) 0 var(--s4);
   border-bottom: 1px solid var(--line);

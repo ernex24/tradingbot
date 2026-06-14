@@ -24,6 +24,8 @@ export default function App() {
   const [stratKey, setStratKey] = useState('ma')
   const [params, setParams] = useState(() => defaultParams('ma'))
   const [interval, setIntervalState] = useState('1440')
+  const [stopPct, setStopPct] = useState(0)
+  const [takePct, setTakePct] = useState(0)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
 
@@ -61,8 +63,8 @@ export default function App() {
     if (paramError || rangeWarn) return null
     if (visibleCandles.length < 2) return null
     const { pos, lines } = S.run(visibleCandles, params)
-    return { ...backtest(visibleCandles, pos), lines }
-  }, [visibleCandles, stratKey, params, paramError, rangeWarn, S])
+    return { ...backtest(visibleCandles, pos, { stopPct, takePct }), lines }
+  }, [visibleCandles, stratKey, params, paramError, rangeWarn, S, stopPct, takePct])
 
   const handleStratChange = key => {
     setStratKey(key)
@@ -157,6 +159,10 @@ export default function App() {
           maxDate={maxDate}
           onDateChange={handleDateChange}
           onResetRange={resetRange}
+          stopPct={stopPct}
+          takePct={takePct}
+          onStopChange={setStopPct}
+          onTakeChange={setTakePct}
           onReload={() => cargarKraken()}
           loading={loading}
         />

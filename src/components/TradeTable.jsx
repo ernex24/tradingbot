@@ -1,5 +1,39 @@
-import { STAKE } from '../lib/backtest.js'
-import { usd, signed, pct } from '../lib/format.js'
+import { usd, usdPrecise, signed, pct, btc } from '../lib/format.js'
+
+function reasonTag(reason) {
+  if (reason === 'SL') return <span className="tag tag-sl" title="Stop loss hit">SL</span>
+  if (reason === 'TP') return <span className="tag tag-tp" title="Take profit hit">TP</span>
+  if (reason === 'open') return <span className="tag tag-open" title="Still open at end of period">open</span>
+  return null
+}
+
+function Header() {
+  return (
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Bought</th>
+        <th>Size</th>
+        <th>Sold</th>
+        <th className="r">Result (net)</th>
+        <th className="r">P&amp;L</th>
+      </tr>
+    </thead>
+  )
+}
+
+function Cols() {
+  return (
+    <colgroup>
+      <col style={{ width: '4%' }} />
+      <col style={{ width: '22%' }} />
+      <col style={{ width: '20%' }} />
+      <col style={{ width: '26%' }} />
+      <col style={{ width: '14%' }} />
+      <col style={{ width: '14%' }} />
+    </colgroup>
+  )
+}
 
 export default function TradeTable({ trades }) {
   if (!trades.length) {
@@ -9,23 +43,11 @@ export default function TradeTable({ trades }) {
           Every trade: when bought, when sold, profit or loss
         </div>
         <table>
-          <colgroup>
-            <col style={{ width: '5%' }} />
-            <col style={{ width: '30%' }} />
-            <col style={{ width: '30%' }} />
-            <col style={{ width: '17%' }} />
-            <col style={{ width: '18%' }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <th>#</th><th>Bought</th><th>Sold</th>
-              <th className="r">Result (net)</th>
-              <th className="r">On $1,000</th>
-            </tr>
-          </thead>
+          <Cols />
+          <Header />
           <tbody>
             <tr>
-              <td colSpan="5" style={{ color: 'var(--mute)' }}>
+              <td colSpan="6" style={{ color: 'var(--mute)' }}>
                 This strategy made no trades in the period.
               </td>
             </tr>
@@ -41,44 +63,38 @@ export default function TradeTable({ trades }) {
         Every trade: when bought, when sold, profit or loss
       </div>
       <table>
-        <colgroup>
-          <col style={{ width: '5%' }} />
-          <col style={{ width: '30%' }} />
-          <col style={{ width: '30%' }} />
-          <col style={{ width: '17%' }} />
-          <col style={{ width: '18%' }} />
-        </colgroup>
-        <thead>
-          <tr>
-            <th>#</th><th>Bought</th><th>Sold</th>
-            <th className="r">Result (net)</th>
-            <th className="r">On $1,000</th>
-          </tr>
-        </thead>
+        <Cols />
+        <Header />
         <tbody>
           {trades.map((t, i) => {
             const cls = t.retNet >= 0 ? 'pos' : 'neg'
-            const dollar = STAKE * t.retNet / 100
             return (
               <tr key={i}>
                 <td className="num">{i + 1}</td>
                 <td className="num">{t.cf} · {usd(t.cp)}</td>
                 <td className="num">
+                  {btc(t.qty)}
+                  <div style={{ color: 'var(--mute)', fontSize: 12 }}>
+                    for {usdPrecise(t.investedUSD)}
+                  </div>
+                </td>
+                <td className="num">
                   {t.vf
-                    ? `${t.vf} · ${usd(t.vp)}`
-                    : <span style={{ color: 'var(--mute)' }}>open position · {usd(t.vp)}</span>}
+                    ? <>{t.vf} · {usd(t.vp)} {reasonTag(t.reason)}</>
+                    : <span style={{ color: 'var(--mute)' }}>open · {usd(t.vp)} {reasonTag(t.reason)}</span>}
                 </td>
                 <td className={`r res num ${cls}`}>{pct(t.retNet)}</td>
-                <td className={`r res num ${cls}`}>{signed(dollar)}</td>
+                <td className={`r res num ${cls}`}>{signed(t.pnlUSD)}</td>
               </tr>
             )
           })}
         </tbody>
       </table>
       <div className="tnote">
-        Net result = entry and exit commissions already subtracted (0.16% each side).
-        The "On $1,000" column shows how much you would have made or lost if you put $1,000
-        on each trade separately (no compounding).
+        Size = BTC bought and dollars invested at entry (the bot reinvests previous profits,
+        so position size grows or shrinks over time). P&amp;L is the real dollar gain or loss
+        for each trade, net of 0.16% commission per side.
+        Sold labels: <b>SL</b> = stop loss hit, <b>TP</b> = take profit hit, no tag = strategy signal.
       </div>
     </section>
   )

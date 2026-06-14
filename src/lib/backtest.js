@@ -1,15 +1,16 @@
-export const STAKE = 1000 // default
-export const COM = 0.0016 // 0.16% por operación (taker Kraken aprox.)
+export const STAKE = 1000
+export const COM = 0.0016 // 0.16% per side (Kraken/Binance taker approx.)
 
-// posRaw[i] = signal computed from data through bar i.
-// Convention (no look-ahead): a signal at bar i-1 takes effect at bar i.
-// Intrabar SL/TP exits use the bar's high/low. If both could fire in the
-// same bar we conservatively assume SL fired first.
+// posRaw[i] ∈ {-1, 0, +1} = signal computed from data through bar i.
+// Executed position during bar i = posRaw[i-1] (no look-ahead).
+//
+// For shorts: bar return for short side = -(price change). SL fires when
+// price RISES above entry by stopPct; TP fires when price FALLS below.
 //
 // opts:
 //   stopPct, takePct: % from entry, 0 = off
 //   stake: starting capital in $ (default 1000)
-//   compound: true (default) = reinvest profits; false = fixed stake per trade
+//   compound: true = reinvest profits (default); false = fixed stake per trade
 export function backtest(c, posRaw, opts = {}) {
   const stopPct = Number(opts.stopPct) || 0
   const takePct = Number(opts.takePct) || 0
@@ -17,27 +18,19 @@ export function backtest(c, posRaw, opts = {}) {
   const compound = opts.compound !== false
   const n = c.length
 
-  const want = i => (i > 0 && posRaw[i - 1] === 1 ? 1 : 0)
+  const want = i => (i > 0 ? (posRaw[i - 1] | 0) : 0)
 
-  // Equity is tracked in units of `stake` (eq = 1 means starting capital).
-  // In compound mode we multiply; in simple mode we add bar returns and
-  // mark to market intrabar for unrealized P&L.
   let bh = 1
   const eqArr = [1], bhArr = [1]
   const trades = []
-
-  // Compound state
-  let eq = 1
-  let entryEq = 1
-
-  // Simple state
+  let eq = 1, entryEq = 1
   let realizedEq = 1
-
-  let inPos = false
+  let side = 0
   let entryIdx = -1, entryPrice = 0
   let barsInPos = 0
 
-  const pushTrade = (kind, i, exitPx, gross, reason) => {
+  const closeTrade = (kind, i, exitPx, reason) => {
+    const gross = side * (exitPx - entryPrice) / entryPrice
     const investedUSD = compound ? entryEq * stake : stake
     const qty = investedUSD / entryPrice
     const sides = kind === 'open' ? 1 : 2
@@ -48,87 +41,111 @@ export function backtest(c, posRaw, opts = {}) {
       vi: kind === 'open' ? null : i,
       vf: kind === 'open' ? null : c[i].f,
       vp: exitPx,
+      side: side === 1 ? 'long' : 'short',
       ret: gross * 100,
       retNet: (gross - sides * COM) * 100,
       reason,
-      qty, investedUSD, pnlUSD, feeUSD,
-      sides,
+      qty, investedUSD, pnlUSD, feeUSD, sides,
     })
   }
 
-  for (let i = 1; i < n; i++) {
-    bh *= c[i].c / c[i - 1].c
-
-    if (inPos) {
-      barsInPos++
-      const slLvl = stopPct > 0 ? entryPrice * (1 - stopPct / 100) : null
-      const tpLvl = takePct > 0 ? entryPrice * (1 + takePct / 100) : null
-      let exitPx = null, exitReason = null
-      if (slLvl != null && c[i].l <= slLvl) {
-        exitPx = slLvl
-        exitReason = 'SL'
-      } else if (tpLvl != null && c[i].h >= tpLvl) {
-        exitPx = tpLvl
-        exitReason = 'TP'
-      }
-
-      if (exitPx != null) {
-        const gross = exitPx / entryPrice - 1
-        if (compound) {
-          const r = exitPx / c[i - 1].c - 1
-          eq *= 1 + r - COM
-        } else {
-          realizedEq += gross - COM
-        }
-        pushTrade('closed', i, exitPx, gross, exitReason)
-        inPos = false
-      } else if (want(i) === 0) {
-        const gross = c[i].c / entryPrice - 1
-        if (compound) {
-          const r = c[i].c / c[i - 1].c - 1
-          eq *= 1 + r - COM
-        } else {
-          realizedEq += gross - COM
-        }
-        pushTrade('closed', i, c[i].c, gross, 'signal')
-        inPos = false
-      } else {
-        if (compound) {
-          const r = c[i].c / c[i - 1].c - 1
-          eq *= 1 + r
-        }
-        // simple: realizedEq stays; mark-to-market handled below
-      }
-    } else if (want(i) === 1) {
+  const openPosition = (i, newSide, includeBarReturn) => {
+    if (includeBarReturn) {
+      const r = newSide * (c[i].c / c[i - 1].c - 1)
       if (compound) {
-        const r = c[i].c / c[i - 1].c - 1
         eq *= 1 + r - COM
         entryEq = eq
       } else {
         realizedEq -= COM
       }
-      inPos = true
-      entryIdx = i
-      entryPrice = c[i].c
-      barsInPos++
+    } else {
+      if (compound) {
+        eq *= 1 - COM
+        entryEq = eq
+      } else {
+        realizedEq -= COM
+      }
     }
+    side = newSide
+    entryIdx = i
+    entryPrice = c[i].c
+    barsInPos++
+  }
+
+  for (let i = 1; i < n; i++) {
+    bh *= c[i].c / c[i - 1].c
+
+    const desired = want(i)
+
+    // 1. SL/TP intrabar check (only if currently in position)
+    let slTpExitPx = null, slTpReason = null
+    if (side !== 0) {
+      if (side === 1) {
+        const slLvl = stopPct > 0 ? entryPrice * (1 - stopPct / 100) : null
+        const tpLvl = takePct > 0 ? entryPrice * (1 + takePct / 100) : null
+        if (slLvl != null && c[i].l <= slLvl) { slTpExitPx = slLvl; slTpReason = 'SL' }
+        else if (tpLvl != null && c[i].h >= tpLvl) { slTpExitPx = tpLvl; slTpReason = 'TP' }
+      } else {
+        const slLvl = stopPct > 0 ? entryPrice * (1 + stopPct / 100) : null
+        const tpLvl = takePct > 0 ? entryPrice * (1 - takePct / 100) : null
+        if (slLvl != null && c[i].h >= slLvl) { slTpExitPx = slLvl; slTpReason = 'SL' }
+        else if (tpLvl != null && c[i].l <= tpLvl) { slTpExitPx = tpLvl; slTpReason = 'TP' }
+      }
+    }
+
+    if (slTpExitPx != null) {
+      // Forced exit intrabar — bar return computed to the SL/TP price
+      const r = side * (slTpExitPx / c[i - 1].c - 1)
+      if (compound) {
+        eq *= 1 + r - COM
+      } else {
+        const gross = side * (slTpExitPx - entryPrice) / entryPrice
+        realizedEq += gross - COM
+      }
+      closeTrade('closed', i, slTpExitPx, slTpReason)
+      side = 0
+      barsInPos++
+    } else if (side !== 0 && desired !== side) {
+      // Strategy wants out or flip. Close at this bar's close.
+      const r = side * (c[i].c / c[i - 1].c - 1)
+      if (compound) {
+        eq *= 1 + r - COM
+      } else {
+        const gross = side * (c[i].c - entryPrice) / entryPrice
+        realizedEq += gross - COM
+      }
+      closeTrade('closed', i, c[i].c, 'signal')
+      barsInPos++
+      side = 0
+      // If desired is non-zero, open new position at same bar's close
+      if (desired !== 0) openPosition(i, desired, false)
+    } else if (side !== 0 && desired === side) {
+      // Stay in position. Capture bar return.
+      const r = side * (c[i].c / c[i - 1].c - 1)
+      if (compound) eq *= 1 + r
+      barsInPos++
+    } else if (side === 0 && desired !== 0) {
+      // Fresh entry at bar i. Capture bar i's return (matches original convention).
+      openPosition(i, desired, true)
+    }
+    // else: flat and stays flat — nothing to do
 
     if (compound) {
       eqArr.push(eq)
     } else {
-      // mark to market: realized + floating P&L from current open position
-      const floating = inPos ? c[i].c / entryPrice - 1 : 0
+      const floating = side !== 0 ? side * (c[i].c / entryPrice - 1) : 0
       eqArr.push(realizedEq + floating)
     }
     bhArr.push(bh)
   }
 
-  if (inPos) {
-    const gross = c[n - 1].c / entryPrice - 1
-    pushTrade('open', n - 1, c[n - 1].c, gross, 'open')
+  if (side !== 0) {
+    closeTrade('open', n - 1, c[n - 1].c, 'open')
   }
 
-  const finalEq = compound ? eq : realizedEq + (inPos ? c[n - 1].c / entryPrice - 1 : 0)
+  const finalEq = compound
+    ? eq
+    : realizedEq + (side !== 0 ? side * (c[n - 1].c / entryPrice - 1) : 0)
   const total = (finalEq - 1) * 100
   const bhTotal = (bh - 1) * 100
   const ganadores = trades.filter(t => t.retNet > 0).length

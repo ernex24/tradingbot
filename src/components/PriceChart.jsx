@@ -35,10 +35,11 @@ export default function PriceChart({ candles, lines, trades }) {
       {trades.map((t, k) => {
         const x1 = X(t.ci)
         const x2 = t.vi != null ? X(t.vi) : X(n - 1)
+        const fill = t.side === 'short' ? '#c0392b' : '#0156CE'
         return (
           <rect key={`band-${k}`} x={x1.toFixed(1)} y={PAD.t}
             width={(x2 - x1).toFixed(1)} height={H - PAD.t - PAD.b}
-            fill="#0156CE" opacity="0.045" />
+            fill={fill} opacity="0.05" />
         )
       })}
       {candles.map((c, i) => {
@@ -65,31 +66,36 @@ export default function PriceChart({ candles, lines, trades }) {
         <path d={linePath(lines.b, X, Y)} fill="none" stroke="#9aa0a6" strokeWidth="1.5" />
       )}
       {trades.map((t, k) => {
+        const isShort = t.side === 'short'
         const xb = X(t.ci), yb = Y(t.cp)
-        const buy = (
-          <g>
-            <path d={`M${xb} ${yb + 16} l-6 11 l12 0 z`} fill="#1b7a4b" />
-            <text x={xb} y={yb + 41} textAnchor="middle" fontSize="9"
-              fontFamily="var(--font, sans-serif)" fill="#1b7a4b">
-              {shortDate(candles[t.ci]?.f)}
-            </text>
-          </g>
+        // Long entry: green up triangle below price.
+        // Short entry: red down triangle above price (selling to open).
+        const entryColor = isShort ? '#c0392b' : '#1b7a4b'
+        const entryGlyph = isShort
+          ? <path d={`M${xb} ${yb - 16} l-6 -11 l12 0 z`} fill={entryColor} />
+          : <path d={`M${xb} ${yb + 16} l-6 11 l12 0 z`} fill={entryColor} />
+        const entryLabel = (
+          <text x={xb} y={isShort ? yb - 32 : yb + 41} textAnchor="middle" fontSize="9"
+            fontFamily="var(--font, sans-serif)" fill={entryColor}>
+            {shortDate(candles[t.ci]?.f)}
+          </text>
         )
-        if (t.vi == null) return <g key={`m-${k}`}>{buy}</g>
+        if (t.vi == null) return <g key={`m-${k}`}>{entryGlyph}{entryLabel}</g>
+        // Exit
         const xs = X(t.vi), ys = Y(t.vp)
-        return (
-          <g key={`m-${k}`}>
-            {buy}
-            <path d={`M${xs} ${ys - 16} l-6 -11 l12 0 z`} fill="#c0392b" />
-            <text x={xs} y={ys - 32} textAnchor="middle" fontSize="9"
-              fontFamily="var(--font, sans-serif)" fill="#c0392b">
-              {shortDate(candles[t.vi]?.f)}
-            </text>
-          </g>
+        const exitColor = isShort ? '#1b7a4b' : '#c0392b'
+        const exitGlyph = isShort
+          ? <path d={`M${xs} ${ys + 16} l-6 11 l12 0 z`} fill={exitColor} />
+          : <path d={`M${xs} ${ys - 16} l-6 -11 l12 0 z`} fill={exitColor} />
+        const exitLabel = (
+          <text x={xs} y={isShort ? ys + 41 : ys - 32} textAnchor="middle" fontSize="9"
+            fontFamily="var(--font, sans-serif)" fill={exitColor}>
+            {shortDate(candles[t.vi]?.f)}
+          </text>
         )
+        return <g key={`m-${k}`}>{entryGlyph}{entryLabel}{exitGlyph}{exitLabel}</g>
       })}
 
-      {/* x-axis baseline */}
       <line x1={PAD.l} y1={H - PAD.b} x2={W - PAD.r} y2={H - PAD.b}
         stroke="#e5e5e5" strokeWidth="1" />
       {ticks.map(i => (

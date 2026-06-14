@@ -186,6 +186,8 @@ input[type=date] {
 .tag-sl { background: #f7e9e8; color: var(--neg); }
 .tag-tp { background: #e8f3ec; color: var(--pos); }
 .tag-open { background: #eef1f4; color: var(--mute); }
+.tag-long { background: #e8f0fb; color: var(--accent); }
+.tag-short { background: #fde9e0; color: #b8531a; }
 
 .chartblock {
   padding: var(--s5) 0 var(--s4);

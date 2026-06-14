@@ -1,8 +1,25 @@
 import { sma, rsi } from './indicators.js'
 
+// Direction modes:
+//   'long'  → positions are 0 or +1
+//   'short' → positions are 0 or -1
+//   'both'  → positions are -1 or +1 (always in market once warmed up)
+//
+// run(candles, params, direction) returns { pos: number[], lines: {a, b} }
+
+function applyDirection(signalLong, direction) {
+  // signalLong[i] is 1 when "long signal active", 0 otherwise.
+  // Translate to {-1, 0, +1} per direction.
+  if (direction === 'long') return signalLong
+  if (direction === 'short') return signalLong.map(v => (v === 1 ? 0 : -1))
+  // 'both': long when signal active, short otherwise. -1 only after warmup.
+  return signalLong.map(v => (v === 1 ? 1 : -1))
+}
+
 export const STRATS = {
   ma: {
     nombre: 'Moving average cross',
+    supportsDirection: true,
     params: [
       { k: 'corta', label: 'Short MA', def: 10, min: 2, max: 100 },
       { k: 'larga', label: 'Long MA', def: 30, min: 5, max: 200 },
@@ -11,19 +28,23 @@ export const STRATS = {
     validar: p => (p.corta >= p.larga
       ? 'Short MA must be smaller than long MA.'
       : null),
-    run: (c, p) => {
+    run: (c, p, direction = 'long') => {
       const close = c.map(x => x.c)
       const mc = sma(close, p.corta)
       const ml = sma(close, p.larga)
-      const pos = close.map((_, i) =>
+      const signalLong = close.map((_, i) =>
         mc[i] != null && ml[i] != null ? (mc[i] > ml[i] ? 1 : 0) : 0
       )
+      // For 'both', avoid -1 during warmup (when MAs aren't ready)
+      const ready = i => mc[i] != null && ml[i] != null
+      const pos = applyDirection(signalLong, direction).map((v, i) => ready(i) ? v : 0)
       return { pos, lines: { a: mc, b: ml } }
     },
   },
 
   rsi: {
     nombre: 'RSI · mean reversion',
+    supportsDirection: true,
     params: [
       { k: 'periodo', label: 'RSI period', def: 14, min: 2, max: 50 },
       { k: 'compra', label: 'Buy below', def: 35, min: 5, max: 50 },
@@ -33,16 +54,18 @@ export const STRATS = {
     validar: p => (p.compra >= p.venta
       ? 'Buy threshold must be lower than sell threshold.'
       : null),
-    run: (c, p) => {
+    run: (c, p, direction = 'long') => {
       const close = c.map(x => x.c)
       const r = rsi(close, p.periodo)
       const pos = new Array(close.length).fill(0)
-      let dentro = 0
+      let estado = 0 // 1 = long-flavored signal active, 0 = not
       for (let i = 0; i < close.length; i++) {
         if (r[i] == null) { pos[i] = 0; continue }
-        if (dentro === 0 && r[i] < p.compra) dentro = 1
-        else if (dentro === 1 && r[i] > p.venta) dentro = 0
-        pos[i] = dentro
+        if (estado === 0 && r[i] < p.compra) estado = 1
+        else if (estado === 1 && r[i] > p.venta) estado = 0
+        if (direction === 'long') pos[i] = estado
+        else if (direction === 'short') pos[i] = estado === 1 ? 0 : -1
+        else pos[i] = estado === 1 ? 1 : -1 // 'both'
       }
       return {
         pos,
@@ -56,12 +79,13 @@ export const STRATS = {
 
   brk: {
     nombre: 'Breakout',
+    supportsDirection: true,
     params: [
       { k: 'lookback', label: 'Lookback', def: 20, min: 5, max: 80 },
     ],
     leyenda: p => ['High ' + p.lookback, 'Low ' + p.lookback],
     validar: () => null,
-    run: (c, p) => {
+    run: (c, p, direction = 'long') => {
       const close = c.map(x => x.c)
       const high = c.map(x => x.h)
       const low = c.map(x => x.l)
@@ -72,12 +96,14 @@ export const STRATS = {
         i >= p.lookback ? Math.min(...low.slice(i - p.lookback, i)) : null
       )
       const pos = new Array(close.length).fill(0)
-      let dentro = 0
+      let estado = 0
       for (let i = 0; i < close.length; i++) {
         if (upper[i] == null) { pos[i] = 0; continue }
-        if (dentro === 0 && close[i] > upper[i]) dentro = 1
-        else if (dentro === 1 && close[i] < lower[i]) dentro = 0
-        pos[i] = dentro
+        if (estado === 0 && close[i] > upper[i]) estado = 1
+        else if (estado === 1 && close[i] < lower[i]) estado = 0
+        if (direction === 'long') pos[i] = estado
+        else if (direction === 'short') pos[i] = estado === 1 ? 0 : -1
+        else pos[i] = estado === 1 ? 1 : -1 // 'both'
       }
       return { pos, lines: { a: upper, b: lower } }
     },
@@ -85,6 +111,7 @@ export const STRATS = {
 
   hold: {
     nombre: 'Buy and hold',
+    supportsDirection: false,
     params: [],
     leyenda: () => ['Price', '—'],
     validar: () => null,

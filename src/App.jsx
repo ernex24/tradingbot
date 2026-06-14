@@ -30,6 +30,7 @@ export default function App() {
   const [takePct, setTakePct] = useState(0)
   const [stake, setStake] = useState(1000)
   const [compound, setCompound] = useState(true)
+  const [direction, setDirection] = useState('long')
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
 
@@ -65,15 +66,17 @@ export default function App() {
     rangeWarn = `Only ${visibleCandles.length} candles in range — need more data for a meaningful backtest.`
   }
 
+  const effectiveDirection = S.supportsDirection ? direction : 'long'
+
   const result = useMemo(() => {
     if (paramError || rangeWarn) return null
     if (visibleCandles.length < 2) return null
-    const { pos, lines } = S.run(visibleCandles, params)
+    const { pos, lines } = S.run(visibleCandles, params, effectiveDirection)
     return {
       ...backtest(visibleCandles, pos, { stopPct, takePct, stake, compound }),
       lines,
     }
-  }, [visibleCandles, stratKey, params, paramError, rangeWarn, S, stopPct, takePct, stake, compound])
+  }, [visibleCandles, stratKey, params, paramError, rangeWarn, S, effectiveDirection, stopPct, takePct, stake, compound])
 
   const handleStratChange = key => {
     setStratKey(key)
@@ -178,6 +181,9 @@ export default function App() {
           compound={compound}
           onStakeChange={setStake}
           onCompoundChange={setCompound}
+          direction={direction}
+          directionSupported={S.supportsDirection}
+          onDirectionChange={setDirection}
           onReload={() => cargarOhlc()}
           loading={loading}
         />

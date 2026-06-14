@@ -7,6 +7,11 @@ function reasonTag(reason) {
   return null
 }
 
+function sideTag(side) {
+  if (side === 'short') return <span className="tag tag-short" title="Short position">SHORT</span>
+  return <span className="tag tag-long" title="Long position">LONG</span>
+}
+
 function Header() {
   return (
     <thead>
@@ -76,7 +81,9 @@ export default function TradeTable({ trades, symbol = 'BTC' }) {
             return (
               <tr key={i}>
                 <td className="num">{i + 1}</td>
-                <td className="num">{t.cf} · {price(t.cp)}</td>
+                <td className="num">
+                  {sideTag(t.side)} {t.cf} · {price(t.cp)}
+                </td>
                 <td className="num">
                   {fmtQty(t.qty, symbol)}
                   <div style={{ color: 'var(--mute)', fontSize: 12 }}>
@@ -112,9 +119,11 @@ export default function TradeTable({ trades, symbol = 'BTC' }) {
         </tbody>
       </table>
       <div className="tnote">
-        Size = {symbol} bought and dollars invested at entry. With <b>compounding on</b>, position
-        size grows or shrinks with previous results; with <b>fixed size</b>, every trade uses
-        the same amount. <b>Fees</b> = 0.16% × invested × number of sides (2 = entry+exit, 1 = entry only on still-open trades).
+        <b>LONG</b> = bought to open, sold to close (wins when price rises).{' '}
+        <b>SHORT</b> = sold to open, bought to close (wins when price falls).
+        Size = {symbol} traded and dollars committed at entry. With <b>compounding on</b>,
+        position size grows or shrinks with previous results; with <b>fixed size</b>, every trade
+        uses the same amount. <b>Fees</b> = 0.16% × committed × sides (2 = entry+exit, 1 = still-open).
         <b>P&amp;L</b> is the real dollar gain or loss for each trade, already net of fees.
         Sold labels: <b>SL</b> = stop loss hit, <b>TP</b> = take profit hit, no tag = strategy signal.
       </div>

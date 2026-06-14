@@ -11,6 +11,12 @@ const TIMEFRAMES = [
 
 const STAKE_PRESETS = [100, 1000, 10000]
 
+const DIRECTIONS = [
+  { value: 'long', label: 'Long only' },
+  { value: 'short', label: 'Short only' },
+  { value: 'both', label: 'Both (always in market)' },
+]
+
 export default function Controls({
   stratKey, params, onStratChange, onParamChange,
   pair, onPairChange,
@@ -18,6 +24,7 @@ export default function Controls({
   desde, hasta, minDate, maxDate, onDateChange, onResetRange,
   stopPct, takePct, onStopChange, onTakeChange,
   stake, compound, onStakeChange, onCompoundChange,
+  direction, directionSupported, onDirectionChange,
   onReload, loading,
 }) {
   const S = STRATS[stratKey]
@@ -61,6 +68,21 @@ export default function Controls({
         >
           {TIMEFRAMES.map(t => (
             <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="ctl">
+        <label htmlFor="dir">Direction</label>
+        <select
+          id="dir"
+          value={direction}
+          onChange={e => onDirectionChange(e.target.value)}
+          disabled={!directionSupported}
+          title={directionSupported ? '' : 'This strategy is long-only.'}
+        >
+          {DIRECTIONS.map(d => (
+            <option key={d.value} value={d.value}>{d.label}</option>
           ))}
         </select>
       </div>

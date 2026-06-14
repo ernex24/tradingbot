@@ -427,6 +427,132 @@ input[type=date] {
   margin-top: 2px;
 }
 
+.account-view {
+  padding: var(--s5) 0 var(--s7);
+  max-width: 720px;
+}
+.account-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: var(--s4);
+  border-bottom: 1px solid var(--line);
+}
+.auth-panel {
+  margin-top: var(--s4);
+}
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  margin-top: var(--s3);
+  max-width: 360px;
+}
+.auth-form input {
+  font-family: var(--font);
+  font-size: 14px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 2px;
+}
+.auth-form .btn { align-self: flex-start; }
+.auth-switch { margin-top: var(--s2); }
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--font);
+  text-decoration: underline;
+}
+.info-box {
+  background: #e8f0fb;
+  border: 1px solid #bcd2f1;
+  color: #1d3a8a;
+  padding: 10px var(--s3);
+  font-size: 13px;
+  border-radius: 2px;
+}
+
+.exchange-block {
+  padding: var(--s4) 0;
+  border-bottom: 1px solid var(--line);
+  margin-top: var(--s3);
+}
+.exchange-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-bottom: var(--s3);
+}
+
+.key-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+.key-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.key-form input[type=text],
+.key-form input[type=password] {
+  font-family: var(--font);
+  font-size: 14px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 2px;
+  letter-spacing: 0.02em;
+}
+.key-form .btn { align-self: flex-start; }
+.key-warn {
+  background: #fef6e7;
+  border: 1px solid #f1d08b;
+  color: #6b4f00;
+  padding: 12px var(--s3);
+  font-size: 13px;
+  border-radius: 2px;
+  line-height: 1.5;
+}
+.key-warn ul {
+  margin: 6px 0 0 20px;
+  padding: 0;
+}
+.key-warn li { margin: 2px 0; }
+
+.connected-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: var(--s3) 0;
+}
+.connected-row code {
+  font-family: 'Courier New', monospace;
+  background: var(--subtle);
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.balance-card {
+  border: 1px solid var(--line);
+  padding: var(--s3);
+  border-radius: 2px;
+}
+.balance-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
 .cross-block {
   padding: var(--s4) 0;
   border-top: 1px solid var(--line);

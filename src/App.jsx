@@ -12,6 +12,7 @@ import PriceChart from './components/PriceChart.jsx'
 import EquityChart from './components/EquityChart.jsx'
 import TradeTable from './components/TradeTable.jsx'
 import TradesView from './components/TradesView.jsx'
+import AccountView from './components/AccountView.jsx'
 
 const BOTS_STORAGE_KEY = 'paperBots.v2'
 const POLL_MS = 30000
@@ -492,6 +493,8 @@ export default function App() {
             currentConfigLabel={currentConfigLabel}
           />
         )}
+
+        {tab === 'account' && <AccountView />}
 
         <footer>
           Research tool, not financial advice. Demo figures do not predict future performance.

@@ -23,14 +23,16 @@ export async function requireUser(req) {
   const auth = req.headers?.authorization || req.headers?.Authorization || ''
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
   if (!token) {
-    console.warn('[auth] no Bearer token in request')
+    console.warn('[auth] FAIL_NO_BEARER_TOKEN')
     throw new Error('unauthorized')
   }
-  // Helpful debug: confirm env vars are present and which project the
-  // backend is talking to. We only log the host of the URL (no secrets).
-  console.warn('[auth] SUPABASE_URL host:', (process.env.SUPABASE_URL || '').replace(/^https?:\/\//, '').split('.')[0])
-  console.warn('[auth] SERVICE_ROLE present:', !!process.env.SUPABASE_SERVICE_ROLE_KEY, 'length:', (process.env.SUPABASE_SERVICE_ROLE_KEY || '').length)
-  console.warn('[auth] token first 16 chars:', token.slice(0, 16), 'length:', token.length)
+  const url = process.env.SUPABASE_URL || ''
+  const role = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  if (!url) console.warn('[auth] FAIL_URL_EMPTY')
+  else console.warn('[auth] URL_OK_HOST_' + url.replace(/^https?:\/\//, '').split('.')[0])
+  if (!role) console.warn('[auth] FAIL_ROLE_EMPTY')
+  else console.warn('[auth] ROLE_OK_LEN_' + role.length)
+  console.warn('[auth] TOKEN_LEN_' + token.length + '_PREFIX_' + token.slice(0, 8))
 
   const admin = getAdminClient()
   const { data, error } = await admin.auth.getUser(token)

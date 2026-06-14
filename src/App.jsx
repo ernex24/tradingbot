@@ -25,6 +25,7 @@ export default function App() {
   const [stratKey, setStratKey] = useState('ma')
   const [params, setParams] = useState(() => defaultParams('ma'))
   const [pair, setPair] = useState('BTC')
+  const [source, setSource] = useState('binance')
   const [interval, setIntervalState] = useState('1d')
   const [stopPct, setStopPct] = useState(0)
   const [takePct, setTakePct] = useState(0)
@@ -90,14 +91,15 @@ export default function App() {
     else setHasta(value || maxDate)
   }
 
-  const cargarOhlc = async (forceInterval, forcePair) => {
+  const cargarOhlc = async (forceInterval, forcePair, forceSource) => {
     const iv = forceInterval ?? interval
     const pr = forcePair ?? pair
+    const src = forceSource ?? source
     const co = coinByPair(pr)
     setLoading(true)
     setLoadError('')
     try {
-      const r = await fetch(`/api/ohlc?coin=${pr}&interval=${iv}`)
+      const r = await fetch(`/api/ohlc?coin=${pr}&interval=${iv}&source=${src}`)
       const data = await r.json()
       if (!r.ok || data.error) {
         throw new Error(data.error || ('HTTP ' + r.status))
@@ -125,11 +127,18 @@ export default function App() {
 
   const handleIntervalChange = (iv) => {
     setIntervalState(iv)
-    cargarOhlc(iv, pair)
+    cargarOhlc(iv, pair, source)
   }
   const handlePairChange = (pr) => {
+    const co = coinByPair(pr)
+    const newSource = co.sources.includes(source) ? source : co.sources[0]
     setPair(pr)
-    cargarOhlc(interval, pr)
+    setSource(newSource)
+    cargarOhlc(interval, pr, newSource)
+  }
+  const handleSourceChange = (src) => {
+    setSource(src)
+    cargarOhlc(interval, pair, src)
   }
 
   // Auto-fetch live data on first mount.
@@ -167,6 +176,8 @@ export default function App() {
           onParamChange={handleParamChange}
           pair={pair}
           onPairChange={handlePairChange}
+          source={source}
+          onSourceChange={handleSourceChange}
           interval={interval}
           onIntervalChange={handleIntervalChange}
           desde={desde}

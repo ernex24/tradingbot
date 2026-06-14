@@ -1,19 +1,28 @@
-// Unified OHLC proxy. Picks the right exchange per coin and normalizes
-// the response to [{t, o, h, l, c}, ...] so the frontend doesn't care
-// which source it came from.
+// Unified OHLC proxy. Picks the right exchange per coin (or honours the
+// caller's source override) and normalizes the response to
+// [{t, o, h, l, c}, ...] so the frontend doesn't care which source it came from.
 //
-// Binance Spot covers BTC, ETH, SOL, SUI.
-// HYPE (Hyperliquid) isn't on Binance Spot — pulled from Hyperliquid's
-// own public info API.
+// Sources:
+//   binance      — Spot, deep history (up to ~3000 candles via pagination)
+//   kraken       — Single call, max 720 candles
+//   hyperliquid  — HYPE only; pulled from their public info API
 //
 // Only reads public market data. No keys, no accounts.
 
-const COINS = {
-  BTC: { source: 'binance', symbol: 'BTCUSDT' },
-  ETH: { source: 'binance', symbol: 'ETHUSDT' },
-  SOL: { source: 'binance', symbol: 'SOLUSDT' },
-  SUI: { source: 'binance', symbol: 'SUIUSDT' },
-  HYPE: { source: 'hyperliquid', symbol: 'HYPE' },
+const BINANCE_SYMBOLS = {
+  BTC: 'BTCUSDT', ETH: 'ETHUSDT', SOL: 'SOLUSDT', SUI: 'SUIUSDT',
+}
+const KRAKEN_SYMBOLS = {
+  BTC: 'XBTUSD', ETH: 'ETHUSD', SOL: 'SOLUSD', SUI: 'SUIUSD', HYPE: 'HYPEUSD',
+}
+const HYPERLIQUID_SYMBOLS = {
+  HYPE: 'HYPE',
+}
+
+// Default source per coin if caller didn't specify.
+const DEFAULT_SOURCE = {
+  BTC: 'binance', ETH: 'binance', SOL: 'binance', SUI: 'binance',
+  HYPE: 'hyperliquid',
 }
 
 const ALLOWED_INTERVALS = ['5m', '15m', '1h', '4h', '1d']
@@ -26,27 +35,43 @@ const INTERVAL_MS = {
   '4h': 4 * 60 * 60 * 1000,
   '1d': 24 * 60 * 60 * 1000,
 }
+const KRAKEN_MINUTES = {
+  '5m': 5, '15m': 15, '1h': 60, '4h': 240, '1d': 1440,
+}
 
 export default async function handler(req, res) {
   const coinKey = String(req.query.coin || 'BTC').toUpperCase()
   const interval = String(req.query.interval || '1d')
+  const source = String(req.query.source || DEFAULT_SOURCE[coinKey] || 'binance').toLowerCase()
 
-  const coin = COINS[coinKey]
-  if (!coin || !ALLOWED_INTERVALS.includes(interval)) {
-    res.status(400).json({ error: 'parameters not allowed' })
+  if (!ALLOWED_INTERVALS.includes(interval)) {
+    res.status(400).json({ error: 'interval not allowed' })
     return
   }
 
   try {
-    const candles =
-      coin.source === 'binance'
-        ? await fetchBinance(coin.symbol, interval)
-        : await fetchHyperliquid(coin.symbol, interval)
+    let candles
+    if (source === 'binance') {
+      const symbol = BINANCE_SYMBOLS[coinKey]
+      if (!symbol) throw new Error(`${coinKey} not available on Binance`)
+      candles = await fetchBinance(symbol, interval)
+    } else if (source === 'kraken') {
+      const symbol = KRAKEN_SYMBOLS[coinKey]
+      if (!symbol) throw new Error(`${coinKey} not available on Kraken`)
+      candles = await fetchKraken(symbol, interval)
+    } else if (source === 'hyperliquid') {
+      const symbol = HYPERLIQUID_SYMBOLS[coinKey]
+      if (!symbol) throw new Error(`${coinKey} not available on Hyperliquid`)
+      candles = await fetchHyperliquid(symbol, interval)
+    } else {
+      res.status(400).json({ error: 'unknown source' })
+      return
+    }
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600')
     res.status(200).json({
       coin: coinKey,
       interval,
-      source: coin.source,
+      source,
       count: candles.length,
       candles,
     })
@@ -77,6 +102,25 @@ async function fetchBinance(symbol, interval) {
     endTime = batch[0][0] - 1
   }
   return all
+}
+
+async function fetchKraken(symbol, interval) {
+  const minutes = KRAKEN_MINUTES[interval]
+  if (!minutes) throw new Error('Kraken: interval not supported')
+  const url = `https://api.kraken.com/0/public/OHLC?pair=${symbol}&interval=${minutes}`
+  const r = await fetch(url, {
+    headers: { 'User-Agent': 'trend-bot/1.0' },
+    signal: AbortSignal.timeout(7000),
+  })
+  if (!r.ok) throw new Error('Kraken HTTP ' + r.status)
+  const data = await r.json()
+  if (data.error && data.error.length) throw new Error('Kraken: ' + data.error.join(', '))
+  const key = Object.keys(data.result).find(k => k !== 'last')
+  const rows = data.result[key]
+  return rows.map(row => ({
+    t: +row[0] * 1000,
+    o: +row[1], h: +row[2], l: +row[3], c: +row[4],
+  }))
 }
 
 async function fetchHyperliquid(coin, interval) {

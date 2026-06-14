@@ -1,4 +1,5 @@
 import { STRATS } from '../lib/strategies.js'
+import { COINS } from '../lib/coins.js'
 
 const TIMEFRAMES = [
   { value: '60', label: '1 hour' },
@@ -10,6 +11,7 @@ const STAKE_PRESETS = [100, 1000, 10000]
 
 export default function Controls({
   stratKey, params, onStratChange, onParamChange,
+  pair, onPairChange,
   interval, onIntervalChange,
   desde, hasta, minDate, maxDate, onDateChange, onResetRange,
   stopPct, takePct, onStopChange, onTakeChange,
@@ -20,6 +22,20 @@ export default function Controls({
 
   return (
     <section className="controls">
+      <div className="ctl">
+        <label htmlFor="coin">Coin</label>
+        <select
+          id="coin"
+          value={pair}
+          onChange={e => onPairChange(e.target.value)}
+          disabled={loading}
+        >
+          {COINS.map(c => (
+            <option key={c.value} value={c.value}>{c.label}</option>
+          ))}
+        </select>
+      </div>
+
       <div className="ctl">
         <label htmlFor="strat">Strategy</label>
         <select

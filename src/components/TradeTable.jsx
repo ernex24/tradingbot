@@ -1,4 +1,4 @@
-import { usd, usdPrecise, signed, pct, btc } from '../lib/format.js'
+import { price, usdPrecise, signed, pct, qty as fmtQty } from '../lib/format.js'
 
 function reasonTag(reason) {
   if (reason === 'SL') return <span className="tag tag-sl" title="Stop loss hit">SL</span>
@@ -35,7 +35,7 @@ function Cols() {
   )
 }
 
-export default function TradeTable({ trades }) {
+export default function TradeTable({ trades, symbol = 'BTC' }) {
   if (!trades.length) {
     return (
       <section className="tradeblock">
@@ -71,17 +71,17 @@ export default function TradeTable({ trades }) {
             return (
               <tr key={i}>
                 <td className="num">{i + 1}</td>
-                <td className="num">{t.cf} · {usd(t.cp)}</td>
+                <td className="num">{t.cf} · {price(t.cp)}</td>
                 <td className="num">
-                  {btc(t.qty)}
+                  {fmtQty(t.qty, symbol)}
                   <div style={{ color: 'var(--mute)', fontSize: 12 }}>
                     for {usdPrecise(t.investedUSD)}
                   </div>
                 </td>
                 <td className="num">
                   {t.vf
-                    ? <>{t.vf} · {usd(t.vp)} {reasonTag(t.reason)}</>
-                    : <span style={{ color: 'var(--mute)' }}>open · {usd(t.vp)} {reasonTag(t.reason)}</span>}
+                    ? <>{t.vf} · {price(t.vp)} {reasonTag(t.reason)}</>
+                    : <span style={{ color: 'var(--mute)' }}>open · {price(t.vp)} {reasonTag(t.reason)}</span>}
                 </td>
                 <td className={`r res num ${cls}`}>{pct(t.retNet)}</td>
                 <td className={`r res num ${cls}`}>{signed(t.pnlUSD)}</td>
@@ -91,7 +91,7 @@ export default function TradeTable({ trades }) {
         </tbody>
       </table>
       <div className="tnote">
-        Size = BTC bought and dollars invested at entry. With <b>compounding on</b>, position
+        Size = {symbol} bought and dollars invested at entry. With <b>compounding on</b>, position
         size grows or shrinks with previous results; with <b>fixed size</b>, every trade uses
         the same amount. P&amp;L is the real dollar gain or loss for each trade,
         net of 0.16% commission per side.

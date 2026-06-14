@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   const pair = (req.query.pair || 'XBTUSD').toString();
   const interval = (req.query.interval || '1440').toString();
 
-  const allowedPairs = ['XBTUSD', 'ETHUSD', 'XBTEUR', 'ETHEUR'];
+  const allowedPairs = ['XBTUSD', 'ETHUSD', 'SOLUSD', 'SUIUSD', 'HYPEUSD'];
   const allowedIntervals = ['60', '240', '1440'];
   if (!allowedPairs.includes(pair) || !allowedIntervals.includes(interval)) {
     res.status(400).json({ error: ['parámetros no permitidos'] });

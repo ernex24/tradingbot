@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { DEMO_CANDLES } from './lib/demoData.js'
 import { STRATS } from './lib/strategies.js'
 import { backtest } from './lib/backtest.js'
+import { coinByPair } from './lib/coins.js'
 import Controls from './components/Controls.jsx'
 import KPIs from './components/KPIs.jsx'
 import PriceChart from './components/PriceChart.jsx'
@@ -23,6 +24,7 @@ export default function App() {
   const [updatedAt, setUpdatedAt] = useState('')
   const [stratKey, setStratKey] = useState('ma')
   const [params, setParams] = useState(() => defaultParams('ma'))
+  const [pair, setPair] = useState('XBTUSD')
   const [interval, setIntervalState] = useState('1440')
   const [stopPct, setStopPct] = useState(0)
   const [takePct, setTakePct] = useState(0)
@@ -30,6 +32,8 @@ export default function App() {
   const [compound, setCompound] = useState(true)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
+
+  const coin = coinByPair(pair)
 
   const minDate = datePart(candles[0]?.f)
   const maxDate = datePart(candles[candles.length - 1]?.f)
@@ -87,12 +91,14 @@ export default function App() {
     setHasta(maxDate)
   }
 
-  const cargarKraken = async (forceInterval) => {
+  const cargarKraken = async (forceInterval, forcePair) => {
     const iv = forceInterval ?? interval
+    const pr = forcePair ?? pair
+    const co = coinByPair(pr)
     setLoading(true)
     setLoadError('')
     try {
-      const r = await fetch(`/api/kraken?pair=XBTUSD&interval=${iv}`)
+      const r = await fetch(`/api/kraken?pair=${pr}&interval=${iv}`)
       if (!r.ok) throw new Error('HTTP ' + r.status)
       const data = await r.json()
       if (data.error && data.error.length) {
@@ -105,15 +111,15 @@ export default function App() {
         const iso = new Date(+row[0] * 1000).toISOString()
         return {
           f: intraday ? iso.slice(0, 16).replace('T', ' ') : iso.slice(0, 10),
-          o: Math.round(+row[1]),
-          h: Math.round(+row[2]),
-          l: Math.round(+row[3]),
-          c: Math.round(+row[4]),
+          o: +row[1],
+          h: +row[2],
+          l: +row[3],
+          c: +row[4],
         }
       })
       setCandles(next)
       const ivLabel = iv === '60' ? '1h' : iv === '240' ? '4h' : '1d'
-      setDataSrc(`live data · Kraken · ${ivLabel}`)
+      setDataSrc(`live data · Kraken · ${co.symbol} · ${ivLabel}`)
       setUpdatedAt('Updated ' + new Date().toLocaleString('en-US'))
     } catch (e) {
       console.warn('Kraken fetch failed:', e)
@@ -126,7 +132,11 @@ export default function App() {
 
   const handleIntervalChange = (iv) => {
     setIntervalState(iv)
-    cargarKraken(iv)
+    cargarKraken(iv, pair)
+  }
+  const handlePairChange = (pr) => {
+    setPair(pr)
+    cargarKraken(interval, pr)
   }
 
   const [l1, l2] = S.leyenda(params)
@@ -144,7 +154,7 @@ export default function App() {
 
       <div className="wrap">
         <header>
-          <h1>Trend Bot <span>/ BTC/USD</span></h1>
+          <h1>Trend Bot <span>/ {coin.symbol}/USD</span></h1>
           <div className="meta">
             <div>{rango}</div>
             <div>{updatedAt || '—'}</div>
@@ -156,6 +166,8 @@ export default function App() {
           params={params}
           onStratChange={handleStratChange}
           onParamChange={handleParamChange}
+          pair={pair}
+          onPairChange={handlePairChange}
           interval={interval}
           onIntervalChange={handleIntervalChange}
           desde={desde}
@@ -222,7 +234,7 @@ export default function App() {
           )}
         </section>
 
-        {result && <TradeTable trades={result.trades} />}
+        {result && <TradeTable trades={result.trades} symbol={coin.symbol} />}
 
         <footer>
           Research tool, not financial advice. Demo figures do not predict future performance.

@@ -8,6 +8,8 @@ que recalcula al vuelo.
 **Es una herramienta de investigación, no asesoramiento financiero. No ejecuta
 órdenes reales.**
 
+Demo en vivo: https://trading-bot-mu-lemon.vercel.app
+
 ## Estructura
 
 ```

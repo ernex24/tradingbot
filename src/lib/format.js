@@ -1,6 +1,9 @@
 export const usd = n => '$' + Math.round(n).toLocaleString('en-US')
 export const usdPrecise = n => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-export const signed = n => (n >= 0 ? '+' : '') + Math.round(n).toLocaleString('en-US')
+export const signed = n => {
+  const sign = n >= 0 ? '+$' : '-$'
+  return sign + Math.round(Math.abs(n)).toLocaleString('en-US')
+}
 export const pct = n => (n >= 0 ? '+' : '') + n.toFixed(1) + '%'
 
 // Price adapts decimals to the magnitude so SOL ($200), SUI ($3) and BTC ($60k) all read well.

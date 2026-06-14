@@ -381,6 +381,52 @@ input[type=date] {
 .tag-src-kraken { background: #e0e9fb; color: #1d3a8a; }
 .tag-src-hyperliquid { background: #def4ec; color: #0e6b46; }
 
+.chart-wrapper {
+  position: relative;
+}
+.chart-tooltip {
+  position: absolute;
+  background: var(--ink);
+  color: #fff;
+  font-size: 12px;
+  padding: 10px 12px;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 200;
+  min-width: 220px;
+  max-width: 280px;
+  line-height: 1.4;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+.chart-tooltip .tt-head {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.chart-tooltip .tt-grid {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  gap: 5px 12px;
+}
+.chart-tooltip .tt-grid > div:nth-child(odd) {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding-top: 1px;
+}
+.chart-tooltip .num {
+  font-variant-numeric: tabular-nums;
+}
+.chart-tooltip .pos { color: #6be9a0; }
+.chart-tooltip .neg { color: #ff8a72; }
+.chart-tooltip .tt-sub {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  margin-top: 2px;
+}
+
 .cross-block {
   padding: var(--s4) 0;
   border-top: 1px solid var(--line);

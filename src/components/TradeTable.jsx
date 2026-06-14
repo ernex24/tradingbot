@@ -100,7 +100,12 @@ export default function TradeTable({ trades, symbol = 'BTC' }) {
                   {usdPrecise(t.feeUSD)}
                   <div style={{ fontSize: 11 }}>{t.sides === 1 ? '1 side' : '2 sides'}</div>
                 </td>
-                <td className={`r res num ${cls}`}>{signed(t.pnlUSD)}</td>
+                <td className={`r res num ${cls}`}>
+                  {signed(t.pnlUSD)}
+                  <div style={{ color: 'var(--mute)', fontSize: 11, fontWeight: 400 }}>
+                    → {usdPrecise(t.investedUSD + t.pnlUSD)}
+                  </div>
+                </td>
               </tr>
             )
           })}

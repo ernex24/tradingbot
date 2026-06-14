@@ -369,6 +369,7 @@ export default function App() {
                   candles={visibleCandles}
                   lines={result.lines}
                   trades={result.trades}
+                  symbol={coin.symbol}
                 />
               )}
             </section>

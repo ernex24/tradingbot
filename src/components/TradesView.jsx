@@ -85,6 +85,10 @@ function buildChartData(bot) {
       vp: t.exitPrice,
       side: t.side,
       reason: t.reason,
+      qty: t.qty,
+      investedUSD: t.invested,
+      pnlUSD: t.pnlUSD,
+      retNet: t.netPct,
     })
   }
   if (bot.state.openPosition) {
@@ -101,6 +105,10 @@ function buildChartData(bot) {
         vp: bot.state.lastPrice ?? op.entryPrice,
         side: op.side === 1 ? 'long' : 'short',
         reason: 'open',
+        qty: op.qty,
+        investedUSD: op.invested,
+        pnlUSD: null,
+        retNet: null,
       })
     }
   }
@@ -185,14 +193,18 @@ function BotCard({ bot, onToggle, onDelete }) {
         <div className="bot-open">
           {sideTag(op.side)} {fmtQty(op.qty, coin.symbol)} · entry {price(op.entryPrice)}{' '}
           <span style={{ color: 'var(--mute)' }}>· {timestamp(op.entryTime)}</span>
-          {state.lastPrice && (
-            <>
-              {' '}· live {price(state.lastPrice)}{' '}
-              <span className={floatingPnL(op, state.lastPrice) >= 0 ? 'pos' : 'neg'}>
-                ({signed(floatingPnL(op, state.lastPrice))})
-              </span>
-            </>
-          )}
+          {state.lastPrice && (() => {
+            const fp = floatingPnL(op, state.lastPrice)
+            const total = op.invested + fp
+            return (
+              <>
+                {' '}· live {price(state.lastPrice)}{' '}
+                <span className={fp >= 0 ? 'pos' : 'neg'}>
+                  ({signed(fp)} → {usdPrecise(total)})
+                </span>
+              </>
+            )
+          })()}
           <div className="bot-open-sl">
             SL: {op.slPrice ? price(op.slPrice) : 'off'} ·
             {' '}TP: {op.tpPrice ? price(op.tpPrice) : 'off'} ·
@@ -217,6 +229,7 @@ function BotCard({ bot, onToggle, onDelete }) {
             lines={chart.lines}
             trades={chart.trades}
             height={220}
+            symbol={coin.symbol}
           />
         ) : (
           <div className="bot-chart-empty">
@@ -326,6 +339,9 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot, onCreateBot
                       </td>
                       <td className={`r num ${fp >= 0 ? 'pos' : 'neg'}`}>
                         {signed(fp)}
+                        <div style={{ color: 'var(--mute)', fontSize: 11, fontWeight: 400 }}>
+                          → {usdPrecise(pos.invested + fp)}
+                        </div>
                       </td>
                     </tr>
                   )
@@ -378,7 +394,12 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot, onCreateBot
                         {timestamp(t.exitTime)} · {price(t.exitPrice)} {reasonTag(t.reason)}
                       </td>
                       <td className={`r num ${cls}`}>{pct(t.netPct)}</td>
-                      <td className={`r num ${cls}`}>{signed(t.pnlUSD)}</td>
+                      <td className={`r num ${cls}`}>
+                        {signed(t.pnlUSD)}
+                        <div style={{ color: 'var(--mute)', fontSize: 11, fontWeight: 400 }}>
+                          → {usdPrecise(t.invested + t.pnlUSD)}
+                        </div>
+                      </td>
                     </tr>
                   )
                 })}

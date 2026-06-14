@@ -22,28 +22,10 @@ export function getAdminClient() {
 export async function requireUser(req) {
   const auth = req.headers?.authorization || req.headers?.Authorization || ''
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
-  if (!token) {
-    console.warn('[auth] FAIL_NO_BEARER_TOKEN')
-    throw new Error('unauthorized')
-  }
-  const url = process.env.SUPABASE_URL || ''
-  const role = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-  if (!url) console.warn('[auth] FAIL_URL_EMPTY')
-  else console.warn('[auth] URL_OK_HOST_' + url.replace(/^https?:\/\//, '').split('.')[0])
-  if (!role) console.warn('[auth] FAIL_ROLE_EMPTY')
-  else console.warn('[auth] ROLE_OK_LEN_' + role.length)
-  console.warn('[auth] TOKEN_LEN_' + token.length + '_PREFIX_' + token.slice(0, 8))
-
+  if (!token) throw new Error('unauthorized')
   const admin = getAdminClient()
   const { data, error } = await admin.auth.getUser(token)
-  if (error) {
-    console.warn('[auth] getUser error:', error?.status, error?.message || error)
-    throw new Error('unauthorized')
-  }
-  if (!data?.user) {
-    console.warn('[auth] getUser returned no user')
-    throw new Error('unauthorized')
-  }
+  if (error || !data?.user) throw new Error('unauthorized')
   return { user_id: data.user.id, email: data.user.email }
 }
 

@@ -3,9 +3,11 @@ import { DEMO_CANDLES } from './lib/demoData.js'
 import { STRATS } from './lib/strategies.js'
 import { backtest } from './lib/backtest.js'
 import { coinByPair } from './lib/coins.js'
-import { createInitialState } from './lib/paperTrader.js'
+import { createInitialState, floatingPnL } from './lib/paperTrader.js'
 import { executeTick as binanceTick, executorSupportsCoin } from './lib/binanceExecutor.js'
 import { binanceStream } from './lib/binanceStream.js'
+import { supabase, authFetch } from './lib/supabase.js'
+import { usdPrecise, signed } from './lib/format.js'
 import Tabs from './components/Tabs.jsx'
 import Controls from './components/Controls.jsx'
 import KPIs from './components/KPIs.jsx'
@@ -67,6 +69,7 @@ export default function App() {
   const [loadError, setLoadError] = useState('')
 
   const [bots, setBots] = useState(() => loadBots())
+  const [usdtBalance, setUsdtBalance] = useState(null)
   useEffect(() => { saveBots(bots) }, [bots])
 
   const coin = coinByPair(pair)
@@ -171,6 +174,44 @@ export default function App() {
     cargarOhlc()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // USDT balance polling --------------------------------------------
+  // Pulls the user's real Binance Testnet USDT balance every 60s when
+  // signed in. Silent on auth/network failure; the header just shows "—".
+  useEffect(() => {
+    if (!supabase) return
+    let cancelled = false
+    const load = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
+          if (!cancelled) setUsdtBalance(null)
+          return
+        }
+        const r = await authFetch('/api/binance/balance?testnet=1')
+        if (!r.ok) return
+        const data = await r.json()
+        if (cancelled) return
+        const usdt = (data.balances || []).find(b => b.asset === 'USDT')
+        setUsdtBalance(usdt ? usdt.total : 0)
+      } catch { /* ignore */ }
+    }
+    load()
+    const id = setInterval(load, 60_000)
+    const { data: sub } = supabase.auth.onAuthStateChange(() => load())
+    return () => {
+      cancelled = true
+      clearInterval(id)
+      sub?.subscription?.unsubscribe?.()
+    }
+  }, [])
+
+  // Total unrealised P&L: sum of every open bot's floating P&L.
+  const unrealisedPnL = bots.reduce((sum, bot) => {
+    if (!bot.state.openPosition || !bot.state.lastPrice) return sum
+    return sum + floatingPnL(bot.state.openPosition, bot.state.lastPrice)
+  }, 0)
+  const anyOpen = bots.some(b => b.state.openPosition)
 
   // Bot management --------------------------------------------------
 
@@ -386,10 +427,20 @@ export default function App() {
 
       <div className="wrap">
         <header>
-          <h1>Trend Bot <span>/ {coin.symbol}/USD</span></h1>
-          <div className="meta">
-            <div>{rango}</div>
-            <div>{updatedAt || '—'}</div>
+          <h1>Trend Bot</h1>
+          <div className="header-stats">
+            <div className="hstat">
+              <div className="label">USDT balance</div>
+              <div className="value">
+                {usdtBalance == null ? '—' : usdPrecise(usdtBalance)}
+              </div>
+            </div>
+            <div className="hstat">
+              <div className="label">Unrealised P&amp;L</div>
+              <div className={`value ${anyOpen ? (unrealisedPnL >= 0 ? 'pos' : 'neg') : 'mute'}`}>
+                {anyOpen ? signed(unrealisedPnL) : '—'}
+              </div>
+            </div>
           </div>
         </header>
 

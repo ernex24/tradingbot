@@ -366,11 +366,14 @@ input[type=date] {
 }
 .kpi-ribbon {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: var(--s4);
   padding: var(--s4) 0;
   border-bottom: 1px solid var(--line);
   margin-bottom: var(--s4);
+}
+@media (max-width: 1100px) {
+  .kpi-ribbon { grid-template-columns: repeat(3, 1fr); }
 }
 .net-toggle {
   display: inline-flex;
@@ -1291,3 +1294,156 @@ footer {
   .ctl-group { flex-direction: column; gap: var(--s2); }
   .ctl-group .group-label { padding-top: 0; flex: none; }
 }
+
+/* -----------------------------------------------------------------
+   Header controls (theme toggle + network toggle)
+----------------------------------------------------------------- */
+.header-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+}
+.theme-toggle {
+  font-family: var(--font);
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.theme-toggle:hover { background: var(--subtle); }
+
+/* -----------------------------------------------------------------
+   Dark mode — sleek, GitHub-Dark-inspired
+----------------------------------------------------------------- */
+[data-theme="dark"] {
+  --ink: #e6edf3;
+  --surface: #0d1117;
+  --mute: #8b949e;
+  --line: #21262d;
+  --subtle: #161b22;
+  --accent: #58a6ff;
+  --pos: #3fb950;
+  --neg: #f85149;
+  color-scheme: dark;
+}
+[data-theme="dark"] body {
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(88,166,255,0.06), transparent 60%),
+    radial-gradient(900px 500px at -10% 30%, rgba(63,185,80,0.04), transparent 60%),
+    var(--surface);
+}
+
+/* Safebar — always dark, but in dark mode it gets a subtle top border */
+[data-theme="dark"] .safebar {
+  background: #010409;
+  color: #e6edf3;
+  border-bottom: 1px solid var(--line);
+}
+[data-theme="dark"] .safebar .dot { background: var(--pos); box-shadow: 0 0 8px var(--pos); }
+[data-theme="dark"] .safebar-stop { background: #010409; border-color: #30363d; color: #e6edf3; }
+[data-theme="dark"] .safebar-stop:hover { background: #161b22; }
+
+/* Header */
+[data-theme="dark"] header { border-bottom-color: var(--line); }
+
+/* Net toggle */
+[data-theme="dark"] .net-toggle button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Tabs */
+[data-theme="dark"] .tab.active { border-bottom-color: var(--accent); }
+[data-theme="dark"] .tab-badge {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Primary buttons — use accent in dark mode (not white-on-near-white) */
+[data-theme="dark"] .btn {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+[data-theme="dark"] .btn:hover { filter: brightness(1.1); }
+[data-theme="dark"] .btn-ghost.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Inputs and selects */
+[data-theme="dark"] select,
+[data-theme="dark"] input[type=number],
+[data-theme="dark"] input[type=text],
+[data-theme="dark"] input[type=password],
+[data-theme="dark"] input[type=date],
+[data-theme="dark"] .safety-input input {
+  background: var(--subtle);
+  border-color: var(--line);
+  color: var(--ink);
+}
+[data-theme="dark"] input[type=date]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+}
+
+/* Tags, pills, warn — translucent fills look much better on dark */
+[data-theme="dark"] .tag-sl,
+[data-theme="dark"] .pill.loss { background: rgba(248,81,73,.16); color: #ff7b72; }
+[data-theme="dark"] .tag-tp,
+[data-theme="dark"] .pill.win { background: rgba(63,185,80,.16); color: #56d364; }
+[data-theme="dark"] .tag-long { background: rgba(88,166,255,.16); color: var(--accent); }
+[data-theme="dark"] .tag-short { background: rgba(248,81,73,.16); color: #ff7b72; }
+[data-theme="dark"] .tag-open { background: rgba(139,148,158,.18); color: var(--mute); }
+[data-theme="dark"] .warn {
+  background: rgba(241,208,139,.08);
+  border-color: rgba(241,208,139,.25);
+  color: #f1d08b;
+}
+
+/* Cards and surfaces */
+[data-theme="dark"] .bot-card,
+[data-theme="dark"] .kpi-cell,
+[data-theme="dark"] .controls,
+[data-theme="dark"] .backtest-empty,
+[data-theme="dark"] .modal,
+[data-theme="dark"] .totals-card,
+[data-theme="dark"] .acct-section,
+[data-theme="dark"] .acct-card,
+[data-theme="dark"] .ctl-group,
+[data-theme="dark"] .key-warn {
+  background: var(--subtle);
+  border-color: var(--line);
+}
+[data-theme="dark"] .bot-card { box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset; }
+
+/* Charts: SVG strokes/fills already use CSS vars where possible; tweak hardcoded grays */
+[data-theme="dark"] .svg-price text,
+[data-theme="dark"] .svg-equity text { fill: var(--mute); }
+[data-theme="dark"] .svg-price line.grid,
+[data-theme="dark"] .svg-equity line.grid { stroke: var(--line); }
+
+/* Trades scroll table */
+[data-theme="dark"] .bot-trades-scroll table th { color: var(--mute); }
+[data-theme="dark"] .bot-trades-scroll table tr { border-bottom-color: var(--line); }
+[data-theme="dark"] .row-open { background: rgba(88,166,255,0.05); }
+
+/* Modal backdrop a touch darker */
+[data-theme="dark"] .modal-backdrop { background: rgba(0,0,0,0.72); }
+
+/* Theme toggle in dark */
+[data-theme="dark"] .theme-toggle {
+  background: var(--subtle);
+  border-color: var(--line);
+  color: #f1d08b;
+}
+[data-theme="dark"] .theme-toggle:hover { background: #1c2128; }
+

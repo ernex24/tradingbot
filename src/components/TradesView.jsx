@@ -43,6 +43,10 @@ function KPIRibbon({ totals }) {
   return (
     <div className="kpi-ribbon">
       <div className="kpi-cell">
+        <div className="label">Starting capital</div>
+        <div className="value">{usdPrecise(totals.startBalance)}</div>
+      </div>
+      <div className="kpi-cell">
         <div className="label">Realized P&amp;L</div>
         <div className={`value ${netCls}`}>{signed(totals.pnl)}</div>
         <div className="sub">{pct(realizedReturnPct)}</div>
@@ -737,66 +741,6 @@ function BotCard({ bot, onToggle, onDelete, onCloseBotPosition, reconciliationWa
   )
 }
 
-function TotalsCard({ totals, botCount }) {
-  const losses = totals.trades - totals.wins
-  const winRate = totals.trades > 0 ? (totals.wins / totals.trades) * 100 : 0
-  const realizedReturnPct = totals.startBalance > 0
-    ? (totals.pnl / totals.startBalance) * 100
-    : 0
-  const netCls = totals.pnl >= 0 ? 'pos' : 'neg'
-  const floatCls = totals.openFloating >= 0 ? 'pos' : 'neg'
-
-  return (
-    <div className="totals-card">
-      <div className="label" style={{ marginBottom: 'var(--s3)' }}>
-        Totals across all bots ({botCount})
-      </div>
-      <table className="totals-table">
-        <tbody>
-          <tr>
-            <td>Starting capital</td>
-            <td className="r num">{usdPrecise(totals.startBalance)}</td>
-          </tr>
-          <tr>
-            <td>Closed trades</td>
-            <td className="r num">
-              {totals.trades}
-              <span style={{ color: 'var(--mute)', fontSize: 11, marginLeft: 8 }}>
-                {totals.wins}W / {losses}L ({winRate.toFixed(0)}% win rate)
-              </span>
-            </td>
-          </tr>
-          <tr>
-            <td>Total invested (sum of every trade)</td>
-            <td className="r num">{usdPrecise(totals.invested)}</td>
-          </tr>
-          <tr>
-            <td>Total fees</td>
-            <td className="r num" style={{ color: 'var(--mute)' }}>
-              {usdPrecise(totals.fees)}
-            </td>
-          </tr>
-          <tr>
-            <td><b>Realized P&amp;L</b></td>
-            <td className={`r num ${netCls}`}>
-              <b>{signed(totals.pnl)}</b>
-              <span style={{ marginLeft: 8 }}>({pct(realizedReturnPct)})</span>
-            </td>
-          </tr>
-          {totals.openCount > 0 && (
-            <tr>
-              <td>Open positions · floating P&amp;L</td>
-              <td className={`r num ${floatCls}`}>
-                {totals.openCount} open · {signed(totals.openFloating)}
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
 export default function TradesView({
   bots, allBotsCount = bots.length, networkView,
   onToggleBot, onDeleteBot, onCloseBotPosition,
@@ -854,7 +798,6 @@ export default function TradesView({
         </div>
       )}
 
-      {bots.length > 0 && <TotalsCard totals={totals} botCount={bots.length} />}
     </div>
   )
 }

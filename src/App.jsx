@@ -78,6 +78,14 @@ export default function App() {
   const [reconciliationWarnings, setReconciliationWarnings] = useState({})
   const [networkView, setNetworkView] = useState('testnet')
   const [backtestStarted, setBacktestStarted] = useState(false)
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === 'undefined') return 'light'
+    return localStorage.getItem('trendbot.theme') || 'light'
+  })
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    try { localStorage.setItem('trendbot.theme', theme) } catch {}
+  }, [theme])
   useEffect(() => { saveBots(bots) }, [bots])
 
   const coin = coinByPair(pair)
@@ -881,17 +889,28 @@ export default function App() {
         <header>
           <h1>Trend Bot</h1>
           <div className="header-right">
-            <div className="net-toggle">
+            <div className="header-controls">
               <button
                 type="button"
-                className={networkView === 'testnet' ? 'active' : ''}
-                onClick={() => setNetworkView('testnet')}
-              >TESTNET</button>
-              <button
-                type="button"
-                className={networkView === 'mainnet' ? 'active' : ''}
-                onClick={() => setNetworkView('mainnet')}
-              >MAINNET</button>
+                className="theme-toggle"
+                onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                aria-label="Toggle theme"
+              >
+                {theme === 'dark' ? '☀' : '☾'}
+              </button>
+              <div className="net-toggle">
+                <button
+                  type="button"
+                  className={networkView === 'testnet' ? 'active' : ''}
+                  onClick={() => setNetworkView('testnet')}
+                >TESTNET</button>
+                <button
+                  type="button"
+                  className={networkView === 'mainnet' ? 'active' : ''}
+                  onClick={() => setNetworkView('mainnet')}
+                >MAINNET</button>
+              </div>
             </div>
             <div className="header-stats">
               <div className="hstat">

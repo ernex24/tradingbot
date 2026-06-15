@@ -939,6 +939,7 @@ export default function App() {
               directionSupported={S.supportsDirection}
               onDirectionChange={v => { markStarted(); setDirection(v) }}
               loading={loading}
+              pristine={!backtestStarted}
             />
 
             {backtestStarted ? (
@@ -1053,12 +1054,6 @@ export default function App() {
                 <div className="backtest-empty-text">
                   Pick a coin, timeframe, strategy and parameters above —
                   results appear automatically as you change them.
-                </div>
-                <div className="backtest-empty-text" style={{ marginTop: 'var(--s3)', fontSize: 13 }}>
-                  You'll see: KPIs (return, drawdown, win rate),
-                  the candle chart with entry/exit markers,
-                  the equity curve vs buy-and-hold,
-                  and the full table of every backtest trade.
                 </div>
               </div>
             )}

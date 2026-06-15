@@ -34,6 +34,7 @@ export default function Controls({
   stake, compound, onStakeChange, onCompoundChange,
   direction, directionSupported, onDirectionChange,
   loading,
+  pristine,
 }) {
   const S = STRATS[stratKey]
 
@@ -48,10 +49,11 @@ export default function Controls({
             </label>
             <select
               id="coin"
-              value={pair}
-              onChange={e => onPairChange(e.target.value)}
+              value={pristine ? '' : pair}
+              onChange={e => { if (e.target.value) onPairChange(e.target.value) }}
               disabled={loading}
             >
+              {pristine && <option value="" disabled>Select a coin</option>}
               {COINS.map(c => (
                 <option key={c.value} value={c.value}>{c.label}</option>
               ))}
@@ -64,10 +66,11 @@ export default function Controls({
             </label>
             <select
               id="tf"
-              value={interval}
-              onChange={e => onIntervalChange(e.target.value)}
+              value={pristine ? '' : interval}
+              onChange={e => { if (e.target.value) onIntervalChange(e.target.value) }}
               disabled={loading}
             >
+              {pristine && <option value="" disabled>Select timeframe</option>}
               {TIMEFRAMES.map(t => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
@@ -113,9 +116,10 @@ export default function Controls({
             </label>
             <select
               id="strat"
-              value={stratKey}
-              onChange={e => onStratChange(e.target.value)}
+              value={pristine ? '' : stratKey}
+              onChange={e => { if (e.target.value) onStratChange(e.target.value) }}
             >
+              {pristine && <option value="" disabled>Select strategy</option>}
               {Object.entries(STRATS).map(([k, s]) => (
                 <option key={k} value={k}>{s.nombre}</option>
               ))}
@@ -128,18 +132,19 @@ export default function Controls({
             </label>
             <select
               id="dir"
-              value={direction}
-              onChange={e => onDirectionChange(e.target.value)}
+              value={pristine ? '' : direction}
+              onChange={e => { if (e.target.value) onDirectionChange(e.target.value) }}
               disabled={!directionSupported}
               title={directionSupported ? '' : 'This strategy is long-only.'}
             >
+              {pristine && <option value="" disabled>Select direction</option>}
               {DIRECTIONS.map(d => (
                 <option key={d.value} value={d.value}>{d.label}</option>
               ))}
             </select>
           </div>
 
-          {S.params.map(p => (
+          {!pristine && S.params.map(p => (
             <div className="ctl" key={p.k}>
               <label htmlFor={`p-${p.k}`}>
                 {p.label} {PARAM_TIPS[p.k] && <InfoTip>{PARAM_TIPS[p.k]}</InfoTip>}
@@ -172,7 +177,8 @@ export default function Controls({
             <input
               id="amount"
               type="number"
-              value={stake}
+              value={pristine ? '' : stake}
+              placeholder={pristine ? 'e.g. 1000' : ''}
               min={1}
               max={10000000}
               step="1"
@@ -206,7 +212,8 @@ export default function Controls({
             <input
               id="sl"
               type="number"
-              value={stopPct}
+              value={pristine ? '' : stopPct}
+              placeholder={pristine ? '0' : ''}
               min={0}
               max={50}
               step="0.1"
@@ -225,7 +232,8 @@ export default function Controls({
             <input
               id="tp"
               type="number"
-              value={takePct}
+              value={pristine ? '' : takePct}
+              placeholder={pristine ? '0' : ''}
               min={0}
               max={500}
               step="0.1"

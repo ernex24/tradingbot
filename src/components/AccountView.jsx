@@ -715,6 +715,7 @@ export default function AccountView({ dailyLossLimit, onDailyLossLimitChange }) 
   const [keys, setKeys] = useState(null)
   const [loading, setLoading] = useState(true)
   const [balanceRefresh, setBalanceRefresh] = useState(0)
+  const [accountNet, setAccountNet] = useState('testnet')
 
   useEffect(() => {
     if (!supabase) { setLoading(false); return }
@@ -809,60 +810,65 @@ export default function AccountView({ dailyLossLimit, onDailyLossLimitChange }) 
         </button>
       </div>
 
-      {/* Binance Testnet — fake money, primary integration */}
+      {/* Unified Binance section — testnet/mainnet swap via toggle */}
       <div className="exchange-block">
         <div className="exchange-head">
           <div style={{ fontSize: 15, fontWeight: 600 }}>Binance</div>
-          <span className="tag tag-testnet">TESTNET</span>
-          <span style={{ color: 'var(--mute)', fontSize: 12 }}>· fake money, real API</span>
+          <div className="net-toggle">
+            <button
+              type="button"
+              className={accountNet === 'testnet' ? 'active' : ''}
+              onClick={() => setAccountNet('testnet')}
+            >TESTNET</button>
+            <button
+              type="button"
+              className={accountNet === 'mainnet' ? 'active' : ''}
+              onClick={() => setAccountNet('mainnet')}
+            >MAINNET</button>
+          </div>
+          <span style={{ color: 'var(--mute)', fontSize: 12 }}>
+            · {accountNet === 'testnet' ? 'fake money, real API' : 'real money'}
+          </span>
         </div>
         {keys === null ? (
           <div style={{ color: 'var(--mute)' }}>Loading…</div>
-        ) : binanceTestnetKey ? (
-          <>
-            <ConnectedHeader
-              keyInfo={binanceTestnetKey}
-              label="Binance Testnet"
-              badgeText="TESTNET"
-              badgeClass="tag-testnet"
-              onDisconnect={refreshKeys}
-            />
-            <div style={{ marginTop: 'var(--s4)' }}>
-              <BinanceBalanceCard testnet={true} refreshKey={balanceRefresh} />
-            </div>
-          </>
+        ) : accountNet === 'testnet' ? (
+          binanceTestnetKey ? (
+            <>
+              <ConnectedHeader
+                keyInfo={binanceTestnetKey}
+                label="Binance Testnet"
+                badgeText="TESTNET"
+                badgeClass="tag-testnet"
+                onDisconnect={refreshKeys}
+              />
+              <div style={{ marginTop: 'var(--s4)' }}>
+                <BinanceBalanceCard testnet={true} refreshKey={balanceRefresh} />
+              </div>
+            </>
+          ) : (
+            <BinanceTestnetForm onSaved={() => refreshKeys()} />
+          )
         ) : (
-          <BinanceTestnetForm onSaved={() => refreshKeys()} />
-        )}
-      </div>
-
-      {/* Binance Mainnet — REAL MONEY */}
-      <div className="exchange-block">
-        <div className="exchange-head">
-          <div style={{ fontSize: 15, fontWeight: 600 }}>Binance</div>
-          <span className="tag tag-mainnet">MAINNET</span>
-          <span style={{ color: 'var(--mute)', fontSize: 12 }}>· real money</span>
-        </div>
-        {keys === null ? (
-          <div style={{ color: 'var(--mute)' }}>Loading…</div>
-        ) : binanceMainnetKey ? (
-          <>
-            <ConnectedHeader
-              keyInfo={binanceMainnetKey}
-              label="Binance Mainnet"
-              badgeText="MAINNET"
-              badgeClass="tag-mainnet"
-              onDisconnect={refreshKeys}
-            />
-            <div className="mainnet-banner">
-              Bots created with the MAINNET button will use this key to place real orders.
-            </div>
-            <div style={{ marginTop: 'var(--s4)' }}>
-              <BinanceBalanceCard testnet={false} refreshKey={balanceRefresh} />
-            </div>
-          </>
-        ) : (
-          <BinanceMainnetForm onSaved={() => refreshKeys()} />
+          binanceMainnetKey ? (
+            <>
+              <ConnectedHeader
+                keyInfo={binanceMainnetKey}
+                label="Binance Mainnet"
+                badgeText="MAINNET"
+                badgeClass="tag-mainnet"
+                onDisconnect={refreshKeys}
+              />
+              <div className="mainnet-banner">
+                Bots created with the MAINNET button will use this key to place real orders.
+              </div>
+              <div style={{ marginTop: 'var(--s4)' }}>
+                <BinanceBalanceCard testnet={false} refreshKey={balanceRefresh} />
+              </div>
+            </>
+          ) : (
+            <BinanceMainnetForm onSaved={() => refreshKeys()} />
+          )
         )}
       </div>
 

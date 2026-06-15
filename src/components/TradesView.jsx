@@ -31,7 +31,7 @@ function computeTotals(bots) {
   })
 }
 
-function KPIRibbon({ totals }) {
+function KPIRibbon({ totals, netFilter, onNetFilterChange }) {
   const losses = totals.trades - totals.wins
   const winRate = totals.trades > 0 ? (totals.wins / totals.trades) * 100 : 0
   const realizedReturnPct = totals.startBalance > 0
@@ -41,6 +41,24 @@ function KPIRibbon({ totals }) {
   const floatCls = totals.openFloating >= 0 ? 'pos' : 'neg'
 
   return (
+    <>
+      <div className="kpi-net-toggle">
+        <button
+          type="button"
+          className={netFilter === 'all' ? 'active' : ''}
+          onClick={() => onNetFilterChange('all')}
+        >All</button>
+        <button
+          type="button"
+          className={netFilter === 'testnet' ? 'active' : ''}
+          onClick={() => onNetFilterChange('testnet')}
+        >Testnet</button>
+        <button
+          type="button"
+          className={netFilter === 'mainnet' ? 'active' : ''}
+          onClick={() => onNetFilterChange('mainnet')}
+        >Mainnet</button>
+      </div>
     <div className="kpi-ribbon">
       <div className="kpi-cell">
         <div className="label">Realized P&amp;L</div>
@@ -68,6 +86,7 @@ function KPIRibbon({ totals }) {
         <div className="sub">{totals.openCount} open</div>
       </div>
     </div>
+    </>
   )
 }
 
@@ -792,12 +811,28 @@ export default function TradesView({
   reconciliationWarnings = {},
 }) {
   const [sortBy, setSortBy] = useState('newest')
-  const totals = useMemo(() => computeTotals(bots), [bots])
-  const sortedBots = useMemo(() => sortBots(bots, sortBy), [bots, sortBy])
+  const [netFilter, setNetFilter] = useState('all')
+
+  const filteredBots = useMemo(() => {
+    if (netFilter === 'all') return bots
+    return bots.filter(b => {
+      const isTestnet = b.config.testnet !== false
+      return netFilter === 'testnet' ? isTestnet : !isTestnet
+    })
+  }, [bots, netFilter])
+
+  const totals = useMemo(() => computeTotals(filteredBots), [filteredBots])
+  const sortedBots = useMemo(() => sortBots(filteredBots, sortBy), [filteredBots, sortBy])
 
   return (
     <div className="trades-view">
-      {bots.length > 0 && <KPIRibbon totals={totals} />}
+      {bots.length > 0 && (
+        <KPIRibbon
+          totals={totals}
+          netFilter={netFilter}
+          onNetFilterChange={setNetFilter}
+        />
+      )}
 
       <div className="trades-head">
         <div>
@@ -805,7 +840,7 @@ export default function TradesView({
           <div style={{ color: 'var(--mute)', fontSize: 13, marginTop: 4 }}>
             {bots.length === 0
               ? 'No bots yet. Configure a strategy in the Backtest tab and click "Create live Testnet bot".'
-              : `${bots.length} ${bots.length === 1 ? 'bot' : 'bots'} · streaming live from Binance Testnet`}
+              : `${filteredBots.length} of ${bots.length} ${bots.length === 1 ? 'bot' : 'bots'} shown · streaming live from Binance`}
           </div>
         </div>
         {bots.length > 1 && (
@@ -841,7 +876,7 @@ export default function TradesView({
         </div>
       )}
 
-      {bots.length > 0 && <TotalsCard totals={totals} botCount={bots.length} />}
+      {bots.length > 0 && <TotalsCard totals={totals} botCount={filteredBots.length} />}
     </div>
   )
 }

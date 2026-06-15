@@ -2,16 +2,19 @@ import { useEffect, useState } from 'react'
 
 // Minimal hash-free URL state. Maps:
 //   /         → backtest
-//   /trades   → trades
+//   /bots     → bots (was /trades)
 //   /account  → account
+//
+// Old /trades links still resolve to the bots tab for backwards compat.
 const PATH_TO_TAB = {
   '/': 'backtest',
-  '/trades': 'trades',
+  '/bots': 'bots',
+  '/trades': 'bots',
   '/account': 'account',
 }
 const TAB_TO_PATH = {
   backtest: '/',
-  trades: '/trades',
+  bots: '/bots',
   account: '/account',
 }
 

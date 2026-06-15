@@ -1013,7 +1013,7 @@ export default function App() {
           </>
         )}
 
-        {tab === 'trades' && (
+        {tab === 'bots' && (
           <TradesView
             bots={bots}
             onToggleBot={handleToggleBot}

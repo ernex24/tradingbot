@@ -10,10 +10,10 @@ export default function Tabs({ tab, onChange, tradeCount }) {
       </button>
       <button
         type="button"
-        className={tab === 'trades' ? 'tab active' : 'tab'}
-        onClick={() => onChange('trades')}
+        className={tab === 'bots' ? 'tab active' : 'tab'}
+        onClick={() => onChange('bots')}
       >
-        Trades
+        Bots
         {tradeCount > 0 && <span className="tab-badge">{tradeCount}</span>}
       </button>
       <button

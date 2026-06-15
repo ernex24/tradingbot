@@ -48,8 +48,8 @@ function KPIRibbon({ totals }) {
         <div className="sub">{pct(realizedReturnPct)}</div>
       </div>
       <div className="kpi-cell">
-        <div className="label">Closed trades</div>
-        <div className="value">{totals.trades}</div>
+        <div className="label">Trades (closed · open)</div>
+        <div className="value">{totals.trades} · {totals.openCount}</div>
         <div className="sub">{totals.wins}W / {losses}L · {winRate.toFixed(0)}% win rate</div>
       </div>
       <div className="kpi-cell">

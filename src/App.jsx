@@ -77,6 +77,7 @@ export default function App() {
   const [dailyLossLimit, setDailyLossLimit] = useState(null)
   const [reconciliationWarnings, setReconciliationWarnings] = useState({})
   const [networkView, setNetworkView] = useState('testnet')
+  const [backtestStarted, setBacktestStarted] = useState(false)
   useEffect(() => { saveBots(bots) }, [bots])
 
   const coin = coinByPair(pair)
@@ -123,14 +124,22 @@ export default function App() {
     }
   }, [visibleCandles, stratKey, params, paramError, rangeWarn, S, effectiveDirection, stopPct, takePct, stake, compound])
 
+  // Track user interaction with the Backtest controls. Until the user
+  // changes anything in Market / Strategy / Money & risk, the page
+  // shows an empty state instead of auto-computed results.
+  const markStarted = () => { if (!backtestStarted) setBacktestStarted(true) }
+
   const handleStratChange = key => {
+    markStarted()
     setStratKey(key)
     setParams(defaultParams(key))
   }
   const handleParamChange = (k, v) => {
+    markStarted()
     setParams(prev => ({ ...prev, [k]: v }))
   }
   const handleDateChange = (which, value) => {
+    markStarted()
     if (which === 'desde') setDesde(value || minDate)
     else setHasta(value || maxDate)
   }
@@ -169,10 +178,12 @@ export default function App() {
   }
 
   const handleIntervalChange = (iv) => {
+    markStarted()
     setIntervalState(iv)
     cargarOhlc(iv, pair)
   }
   const handlePairChange = (pr) => {
+    markStarted()
     setPair(pr)
     cargarOhlc(interval, pr)
   }
@@ -918,18 +929,20 @@ export default function App() {
               onDateChange={handleDateChange}
               stopPct={stopPct}
               takePct={takePct}
-              onStopChange={setStopPct}
-              onTakeChange={setTakePct}
+              onStopChange={v => { markStarted(); setStopPct(v) }}
+              onTakeChange={v => { markStarted(); setTakePct(v) }}
               stake={stake}
               compound={compound}
-              onStakeChange={setStake}
-              onCompoundChange={setCompound}
+              onStakeChange={v => { markStarted(); setStake(v) }}
+              onCompoundChange={v => { markStarted(); setCompound(v) }}
               direction={direction}
               directionSupported={S.supportsDirection}
-              onDirectionChange={setDirection}
+              onDirectionChange={v => { markStarted(); setDirection(v) }}
               loading={loading}
             />
 
+            {backtestStarted ? (
+              <>
             <div className="post-controls">
               <button
                 type="button"
@@ -1033,6 +1046,22 @@ export default function App() {
             </section>
 
             {result && <TradeTable trades={result.trades} symbol={coin.symbol} />}
+              </>
+            ) : (
+              <div className="backtest-empty">
+                <div className="backtest-empty-title">Configure a strategy to start</div>
+                <div className="backtest-empty-text">
+                  Pick a coin, timeframe, strategy and parameters above —
+                  results appear automatically as you change them.
+                </div>
+                <div className="backtest-empty-text" style={{ marginTop: 'var(--s3)', fontSize: 13 }}>
+                  You'll see: KPIs (return, drawdown, win rate),
+                  the candle chart with entry/exit markers,
+                  the equity curve vs buy-and-hold,
+                  and the full table of every backtest trade.
+                </div>
+              </div>
+            )}
           </>
         )}
 

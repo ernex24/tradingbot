@@ -335,6 +335,23 @@ input[type=date] {
   align-items: center;
   border-bottom: 1px solid var(--line);
 }
+.backtest-empty {
+  padding: var(--s7) var(--s4);
+  text-align: center;
+  color: var(--mute);
+}
+.backtest-empty-title {
+  font-size: 18px;
+  color: var(--ink);
+  font-weight: 600;
+  margin-bottom: var(--s2);
+}
+.backtest-empty-text {
+  max-width: 540px;
+  margin: 0 auto;
+  font-size: 14px;
+  line-height: 1.6;
+}
 .btn-danger {
   color: var(--neg);
   border-color: var(--neg);

@@ -119,13 +119,20 @@ function BinanceMainnetForm({ onSaved }) {
         />
       </label>
       <label>
-        Secret Key <InfoTip>Encrypted with AES-256-GCM before storage. Validated by calling /api/v3/account on mainnet.</InfoTip>
-        <input
-          type="password"
+        Secret Key or PEM private key{' '}
+        <InfoTip>
+          Paste either: (a) the HMAC Secret Key from a System Generated key — single line of letters and digits; or
+          (b) the entire contents of the .pem file from a Self-Generated Ed25519 or RSA key, including the BEGIN/END lines.
+          Stored AES-256-GCM encrypted. Server auto-detects the format.
+        </InfoTip>
+        <textarea
           value={apiSecret}
           onChange={e => setApiSecret(e.target.value)}
           autoComplete="off"
           required
+          rows={4}
+          style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12, resize: 'vertical', width: '100%' }}
+          placeholder={'HMAC secret\nOR\n-----BEGIN PRIVATE KEY-----\n... (full PEM contents) ...\n-----END PRIVATE KEY-----'}
         />
       </label>
       <label className="toggle">

@@ -562,7 +562,7 @@ function PositionsTable({ bot, symbol, onCloseOpen }) {
   )
 }
 
-function BotCard({ bot, onToggle, onDelete, onCloseBotPosition }) {
+function BotCard({ bot, onToggle, onDelete, onCloseBotPosition, reconciliationWarning }) {
   const { config, state } = bot
   const coin = coinByPair(config.pair)
   const S = STRATS[config.stratKey]
@@ -613,6 +613,12 @@ function BotCard({ bot, onToggle, onDelete, onCloseBotPosition }) {
           {state.lastError && (
             <div style={{ color: 'var(--neg)', fontSize: 12, marginTop: 4 }}>
               ⚠ Last tick error: {state.lastError}
+            </div>
+          )}
+          {reconciliationWarning && (
+            <div style={{ color: 'var(--neg)', fontSize: 12, marginTop: 4, fontWeight: 600 }}>
+              ⚠ Reconciliation mismatch — bot says it holds {reconciliationWarning.expected.toFixed(6)} {reconciliationWarning.coin},
+              {' '}Binance reports only {reconciliationWarning.actual.toFixed(6)}. Bot paused.
             </div>
           )}
         </div>
@@ -781,7 +787,10 @@ function TotalsCard({ totals, botCount }) {
   )
 }
 
-export default function TradesView({ bots, onToggleBot, onDeleteBot, onCloseBotPosition }) {
+export default function TradesView({
+  bots, onToggleBot, onDeleteBot, onCloseBotPosition,
+  reconciliationWarnings = {},
+}) {
   const [sortBy, setSortBy] = useState('newest')
   const totals = useMemo(() => computeTotals(bots), [bots])
   const sortedBots = useMemo(() => sortBots(bots, sortBy), [bots, sortBy])
@@ -826,6 +835,7 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot, onCloseBotP
               onToggle={onToggleBot}
               onDelete={onDeleteBot}
               onCloseBotPosition={onCloseBotPosition}
+              reconciliationWarning={reconciliationWarnings[b.id]}
             />
           ))}
         </div>

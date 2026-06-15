@@ -547,7 +547,163 @@ function ConnectedHeader({ keyInfo, label, badgeText, badgeClass, onDisconnect }
   )
 }
 
-export default function AccountView() {
+function SafetySettings({ dailyLossLimit, onDailyLossLimitChange }) {
+  const [limit, setLimit] = useState(dailyLossLimit ?? '')
+  const [telegramBotToken, setTelegramBotToken] = useState('')
+  const [telegramChatId, setTelegramChatId] = useState('')
+  const [telegramConfigured, setTelegramConfigured] = useState(false)
+  const [telegramEnabled, setTelegramEnabled] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const r = await authFetch('/api/settings/get')
+        if (!r.ok) return
+        const { settings } = await r.json()
+        if (cancelled) return
+        setTelegramConfigured(!!settings?.telegramConfigured)
+        setTelegramChatId(settings?.telegramChatId || '')
+        setTelegramEnabled(settings?.telegramEnabled !== false)
+        if (settings?.dailyLossLimit != null) setLimit(String(settings.dailyLossLimit))
+      } catch {}
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const saveLimit = async () => {
+    setBusy(true); setMsg('')
+    try {
+      const v = limit === '' ? null : Math.max(0, +limit)
+      const r = await authFetch('/api/settings/save', {
+        method: 'POST',
+        body: JSON.stringify({ dailyLossLimit: v }),
+      })
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}))
+        throw new Error(d.error || 'failed')
+      }
+      onDailyLossLimitChange(v)
+      setMsg(v == null ? 'Limit removed.' : `Limit set to ${v} USDT.`)
+    } catch (e) {
+      setMsg('Error: ' + e.message)
+    } finally { setBusy(false) }
+  }
+
+  const saveTelegram = async () => {
+    setBusy(true); setMsg('')
+    try {
+      const body = {}
+      if (telegramBotToken) body.telegramBotToken = telegramBotToken
+      if (telegramChatId) body.telegramChatId = telegramChatId
+      body.telegramEnabled = telegramEnabled
+      const r = await authFetch('/api/settings/save', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}))
+        throw new Error(d.error || 'failed')
+      }
+      if (telegramBotToken) setTelegramConfigured(true)
+      setTelegramBotToken('')
+      setMsg('Telegram settings saved.')
+    } catch (e) {
+      setMsg('Error: ' + e.message)
+    } finally { setBusy(false) }
+  }
+
+  const sendTest = async () => {
+    setBusy(true); setMsg('')
+    try {
+      const r = await authFetch('/api/notify/telegram', {
+        method: 'POST',
+        body: JSON.stringify({ text: '✅ Test message from <b>Trend Bot</b>' }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || 'failed')
+      setMsg(d.sent ? 'Test message sent.' : `Not sent: ${d.reason || 'unknown'}`)
+    } catch (e) {
+      setMsg('Error: ' + e.message)
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="exchange-block">
+      <div className="exchange-head">
+        <div style={{ fontSize: 15, fontWeight: 600 }}>Safety & notifications</div>
+      </div>
+
+      <div className="safety-row">
+        <div>
+          <div className="label">Daily loss limit (USDT)</div>
+          <div style={{ color: 'var(--mute)', fontSize: 12, marginTop: 4 }}>
+            If today's realized loss exceeds this, ALL bots are auto-paused.
+            Leave empty to disable.
+          </div>
+        </div>
+        <div className="safety-input">
+          <input
+            type="number" min="0" step="1"
+            value={limit}
+            onChange={e => setLimit(e.target.value)}
+            placeholder="e.g. 50"
+            style={{ width: 120 }}
+          />
+          <button className="btn-ghost" onClick={saveLimit} disabled={busy}>Save</button>
+        </div>
+      </div>
+
+      <div className="safety-row" style={{ borderTop: '1px solid var(--line)', paddingTop: 'var(--s3)' }}>
+        <div>
+          <div className="label">
+            Telegram notifications
+            <InfoTip>
+              Get push notifications on Telegram for: entries, exits, daily-loss stop,
+              reconciliation mismatches, emergency stops. Create a bot via @BotFather
+              to get a token; get your chat id by messaging @userinfobot.
+            </InfoTip>
+          </div>
+          <div style={{ color: 'var(--mute)', fontSize: 12, marginTop: 4 }}>
+            {telegramConfigured ? '✓ Configured. Token stored encrypted.' : 'Not configured.'}
+          </div>
+        </div>
+        <div className="safety-input safety-input-stack">
+          <input
+            type="password"
+            value={telegramBotToken}
+            onChange={e => setTelegramBotToken(e.target.value)}
+            placeholder={telegramConfigured ? 'New bot token (leave empty to keep current)' : 'Bot token from @BotFather'}
+            style={{ width: 280 }}
+          />
+          <input
+            type="text"
+            value={telegramChatId}
+            onChange={e => setTelegramChatId(e.target.value)}
+            placeholder="Chat ID (digits)"
+            style={{ width: 280 }}
+          />
+          <label className="toggle">
+            <input type="checkbox" checked={telegramEnabled} onChange={e => setTelegramEnabled(e.target.checked)} />
+            <span>{telegramEnabled ? 'notifications on' : 'notifications off'}</span>
+          </label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-ghost" onClick={saveTelegram} disabled={busy}>Save Telegram</button>
+            {telegramConfigured && (
+              <button className="btn-ghost" onClick={sendTest} disabled={busy}>Send test</button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {msg && <div className="info-box" style={{ marginTop: 'var(--s3)' }}>{msg}</div>}
+    </div>
+  )
+}
+
+export default function AccountView({ dailyLossLimit, onDailyLossLimitChange }) {
   const [session, setSession] = useState(null)
   const [keys, setKeys] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -708,6 +864,11 @@ export default function AccountView() {
           <BinanceMainnetForm onSaved={() => refreshKeys()} />
         )}
       </div>
+
+      <SafetySettings
+        dailyLossLimit={dailyLossLimit}
+        onDailyLossLimitChange={onDailyLossLimitChange}
+      />
     </div>
   )
 }

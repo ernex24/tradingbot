@@ -9,6 +9,7 @@ import { binanceStream } from './lib/binanceStream.js'
 import { supabase, authFetch } from './lib/supabase.js'
 import { usdPrecise, signed } from './lib/format.js'
 import { usePath, pathToTab, tabToPath } from './lib/router.js'
+import { notify } from './lib/notify.js'
 import Tabs from './components/Tabs.jsx'
 import Controls from './components/Controls.jsx'
 import KPIs from './components/KPIs.jsx'
@@ -73,6 +74,8 @@ export default function App() {
 
   const [bots, setBots] = useState(() => loadBots())
   const [usdtBalance, setUsdtBalance] = useState(null)
+  const [dailyLossLimit, setDailyLossLimit] = useState(null)
+  const [reconciliationWarnings, setReconciliationWarnings] = useState({})
   useEffect(() => { saveBots(bots) }, [bots])
 
   const coin = coinByPair(pair)
@@ -404,6 +407,84 @@ export default function App() {
     return () => { cancelled = true; sub?.subscription?.unsubscribe?.() }
   }, [])
 
+  // Settings load (daily limit, Telegram on/off flags) --------------
+  useEffect(() => {
+    if (!supabase) return
+    let cancelled = false
+    const load = async (session) => {
+      if (!session) return
+      try {
+        const r = await authFetch('/api/settings/get')
+        if (!r.ok) return
+        const { settings } = await r.json()
+        if (cancelled) return
+        setDailyLossLimit(settings?.dailyLossLimit ?? null)
+      } catch { /* ignore */ }
+    }
+    supabase.auth.getSession().then(({ data }) => load(data.session))
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => load(s))
+    return () => { cancelled = true; sub?.subscription?.unsubscribe?.() }
+  }, [])
+
+  // Periodic reconciliation -----------------------------------------
+  // Every 5 minutes, for each bot with an open position, ask Binance
+  // for the actual balance of that coin. If it's materially less than
+  // what the bot expects (allowing 5% slack for fees/other bots), flag
+  // the bot — and notify.
+  useEffect(() => {
+    if (!supabase) return
+    const reconcile = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
+        const openBots = botsRef.current.filter(b => b.state.openPosition)
+        if (!openBots.length) return
+
+        // Group by testnet flag — separate balance fetches per network.
+        const networks = new Set(openBots.map(b => b.config.testnet !== false ? 1 : 0))
+        const byNetwork = {}
+        for (const net of networks) {
+          try {
+            const r = await authFetch(`/api/binance/balance?testnet=${net}`)
+            if (!r.ok) continue
+            const data = await r.json()
+            const map = {}
+            for (const b of data.balances || []) map[b.asset] = b.total
+            byNetwork[net] = map
+          } catch { /* ignore */ }
+        }
+
+        const next = {}
+        for (const bot of openBots) {
+          const op = bot.state.openPosition
+          const net = bot.config.testnet !== false ? 1 : 0
+          const balances = byNetwork[net]
+          if (!balances) continue
+          const have = balances[bot.config.pair] ?? 0
+          const expected = op.qty
+          if (have < expected * 0.95) {
+            next[bot.id] = {
+              expected,
+              actual: have,
+              coin: bot.config.pair,
+            }
+            notify(`⚠ <b>Reconciliation mismatch</b>\nBot: ${bot.name}\nExpected ${expected.toFixed(6)} ${bot.config.pair}, found ${have.toFixed(6)}.\nBot will be paused.`)
+          }
+        }
+        setReconciliationWarnings(next)
+        if (Object.keys(next).length) {
+          const mismatchIds = new Set(Object.keys(next))
+          setBots(prev => prev.map(b =>
+            mismatchIds.has(b.id) ? { ...b, running: false } : b
+          ))
+        }
+      } catch { /* ignore */ }
+    }
+    reconcile()
+    const id = setInterval(reconcile, 5 * 60 * 1000)
+    return () => clearInterval(id)
+  }, [])
+
   // USDT balance polling --------------------------------------------
   // Pulls the user's real Binance Testnet USDT balance every 60s when
   // signed in. Silent on auth/network failure; the header just shows "—".
@@ -441,6 +522,53 @@ export default function App() {
     return sum + floatingPnL(bot.state.openPosition, bot.state.lastPrice)
   }, 0)
   const anyOpen = bots.some(b => b.state.openPosition)
+
+  // Safety: today's realized P&L + daily-loss auto-stop ------------
+  const todayPnL = useMemo(() => {
+    const startOfToday = new Date()
+    startOfToday.setHours(0, 0, 0, 0)
+    const cutoff = startOfToday.getTime()
+    let sum = 0
+    for (const bot of bots) {
+      for (const t of bot.state.closedTrades) {
+        if (t.exitTime > cutoff) sum += t.pnlUSD || 0
+      }
+    }
+    return sum
+  }, [bots])
+
+  const dailyLimitTriggeredRef = useRef(false)
+  useEffect(() => {
+    if (!dailyLossLimit || dailyLossLimit <= 0) return
+    if (todayPnL >= -dailyLossLimit) {
+      dailyLimitTriggeredRef.current = false
+      return
+    }
+    if (dailyLimitTriggeredRef.current) return
+    const hasRunning = bots.some(b => b.running)
+    if (!hasRunning) return
+    dailyLimitTriggeredRef.current = true
+    setBots(prev => prev.map(b => ({ ...b, running: false })))
+    notify(`🛑 <b>Daily loss limit hit</b>\nToday: ${todayPnL.toFixed(2)} USDT (limit −${dailyLossLimit} USDT)\nAll bots paused.`)
+  }, [todayPnL, dailyLossLimit, bots])
+
+  // Reset the trigger at midnight so the next day starts clean.
+  useEffect(() => {
+    const now = new Date()
+    const midnight = new Date(now)
+    midnight.setHours(24, 0, 0, 0)
+    const delay = midnight.getTime() - now.getTime()
+    const t = setTimeout(() => { dailyLimitTriggeredRef.current = false }, delay)
+    return () => clearTimeout(t)
+  }, [])
+
+  const handleEmergencyStop = () => {
+    const running = bots.filter(b => b.running)
+    if (running.length === 0) return
+    if (!window.confirm(`Pause all ${running.length} running bot${running.length === 1 ? '' : 's'} immediately?`)) return
+    setBots(prev => prev.map(b => ({ ...b, running: false })))
+    notify(`🛑 <b>Emergency stop activated</b>\n${running.length} bot${running.length === 1 ? '' : 's'} paused.`)
+  }
 
   // Bot management --------------------------------------------------
 
@@ -578,6 +706,20 @@ export default function App() {
       let next
       try {
         next = await binanceTick(bot.state, signal, last.c, last, Date.now(), opts)
+        // Diff against previous state to fire Telegram notifications.
+        const prevHadOpen = !!bot.state.openPosition
+        const nextHasOpen = !!next.openPosition
+        const prevClosedCount = bot.state.closedTrades.length
+        const nextClosedCount = next.closedTrades.length
+        const networkTag = opts.testnet ? 'TESTNET' : '<b>MAINNET ⚠</b>'
+        if (!prevHadOpen && nextHasOpen) {
+          notify(`🟢 <b>Entry</b> · ${bot.name}\n${networkTag}\nBought ${next.openPosition.qty.toFixed(6)} ${cfg.pair} at ${next.openPosition.entryPrice.toFixed(2)} USDT`)
+        }
+        if (nextClosedCount > prevClosedCount) {
+          const t = next.closedTrades[nextClosedCount - 1]
+          const sign = t.pnlUSD >= 0 ? '+' : ''
+          notify(`🔴 <b>Exit</b> · ${bot.name}\n${networkTag}\nSold at ${t.exitPrice.toFixed(2)} USDT (${t.reason})\nP&L: ${sign}${t.pnlUSD.toFixed(2)} USDT (${sign}${t.netPct.toFixed(2)}%)`)
+        }
       } catch (e) {
         console.warn(`bot ${bot.name} executor error:`, e?.message || e)
         next = {
@@ -681,7 +823,36 @@ export default function App() {
     <>
       <div className="safebar">
         <span className="dot"></span>
-        Safe mode · the bot does not place real orders
+        {(() => {
+          const running = bots.filter(b => b.running).length
+          const anyMainnet = bots.some(b => b.running && b.config.testnet === false)
+          if (running === 0) return <>No bots running</>
+          return (
+            <>
+              {running} bot{running === 1 ? '' : 's'} running
+              {anyMainnet && <span className="safebar-mainnet"> · MAINNET ⚠</span>}
+              <button
+                type="button"
+                className="safebar-stop"
+                onClick={handleEmergencyStop}
+                title="Pause every running bot immediately"
+              >
+                🛑 PAUSE ALL
+              </button>
+            </>
+          )
+        })()}
+        <span className="safebar-pnl">
+          today{' '}
+          <span className={todayPnL >= 0 ? 'pos' : 'neg'}>
+            {signed(todayPnL)}
+          </span>
+          {dailyLossLimit > 0 && (
+            <span style={{ color: 'rgba(255,255,255,0.5)', marginLeft: 6 }}>
+              · limit −{dailyLossLimit}
+            </span>
+          )}
+        </span>
         <span className="datasrc">{dataSrc}</span>
       </div>
 
@@ -848,10 +1019,16 @@ export default function App() {
             onToggleBot={handleToggleBot}
             onDeleteBot={handleDeleteBot}
             onCloseBotPosition={handleCloseBotPosition}
+            reconciliationWarnings={reconciliationWarnings}
           />
         )}
 
-        {tab === 'account' && <AccountView />}
+        {tab === 'account' && (
+          <AccountView
+            dailyLossLimit={dailyLossLimit}
+            onDailyLossLimitChange={setDailyLossLimit}
+          />
+        )}
 
         <footer>
           Research tool, not financial advice. Demo figures do not predict future performance.

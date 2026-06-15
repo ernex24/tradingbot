@@ -1411,19 +1411,36 @@ footer {
 
 /* Cards and surfaces */
 [data-theme="dark"] .bot-card,
-[data-theme="dark"] .kpi-cell,
-[data-theme="dark"] .controls,
-[data-theme="dark"] .backtest-empty,
 [data-theme="dark"] .modal,
 [data-theme="dark"] .totals-card,
 [data-theme="dark"] .acct-section,
 [data-theme="dark"] .acct-card,
-[data-theme="dark"] .ctl-group,
 [data-theme="dark"] .key-warn {
   background: var(--subtle);
   border-color: var(--line);
 }
 [data-theme="dark"] .bot-card { box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset; }
+
+/* No background on backtest controls or KPI cells in dark — let the
+   canvas show through; only border-color updates for line visibility */
+[data-theme="dark"] .controls,
+[data-theme="dark"] .ctl-group,
+[data-theme="dark"] .backtest-empty,
+[data-theme="dark"] .kpi-cell,
+[data-theme="dark"] .kpi-ribbon {
+  background: transparent;
+  border-color: var(--line);
+}
+
+/* LIVE MAINNET / LIVE TESTNET chips — readable on dark */
+[data-theme="dark"] .tag-mainnet {
+  background: var(--neg);
+  color: #fff;
+}
+[data-theme="dark"] .tag-testnet {
+  background: rgba(63,185,80,.18);
+  color: #56d364;
+}
 
 /* Charts: SVG strokes/fills already use CSS vars where possible; tweak hardcoded grays */
 [data-theme="dark"] .svg-price text,

@@ -126,6 +126,11 @@ function ageLabel(ts) {
   return `${Math.round(s / 3600)}h ago`
 }
 
+function capitalize(s) {
+  if (!s) return ''
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
 function reasonTag(reason) {
   if (reason === 'SL') return <span className="tag tag-sl">SL</span>
   if (reason === 'TP') return <span className="tag tag-tp">TP</span>
@@ -599,16 +604,18 @@ function BotCard({ bot, onToggle, onDelete, onCloseBotPosition, reconciliationWa
       <div className="bot-head">
         <div>
           <div className="bot-name">
-            {bot.name}{' '}
+            {coin.symbol}/USDT{' '}
             {bot.config.testnet === false
               ? <span className="tag tag-mainnet">LIVE MAINNET</span>
               : <span className="tag tag-testnet">LIVE TESTNET</span>}
           </div>
           <div className="bot-meta">
-            {coin.symbol} · {config.interval} · {S.nombre} · {config.effectiveDirection}
-            {config.stopPct > 0 && ` · SL ${config.stopPct}%`}
-            {config.takePct > 0 && ` · TP ${config.takePct}%`}
-            {' · '}{config.compound ? 'compounding' : 'fixed size'}
+            Strategy {S.nombre}
+            {' · '}Direction {capitalize(config.effectiveDirection)}
+            {' · '}Stop loss {config.stopPct > 0 ? `${config.stopPct}%` : 'off'}
+            {' · '}Take profit {config.takePct > 0 ? `${config.takePct}%` : 'off'}
+            {' · '}Timeframe {config.interval}
+            {' · '}{config.compound ? 'Reinvest on' : 'Fixed size'}
           </div>
           {state.lastError && (
             <div style={{ color: 'var(--neg)', fontSize: 12, marginTop: 4 }}>

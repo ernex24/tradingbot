@@ -909,7 +909,7 @@ export default function App() {
           </div>
         </header>
 
-        <Tabs tab={tab} onChange={setTab} tradeCount={bots.length} />
+        <Tabs tab={tab} onChange={setTab} tradeCount={networkBots.length} />
 
         {tab === 'backtest' && (
           <>

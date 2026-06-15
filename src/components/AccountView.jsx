@@ -710,12 +710,12 @@ function SafetySettings({ dailyLossLimit, onDailyLossLimitChange }) {
   )
 }
 
-export default function AccountView({ dailyLossLimit, onDailyLossLimitChange }) {
+export default function AccountView({ networkView, dailyLossLimit, onDailyLossLimitChange }) {
   const [session, setSession] = useState(null)
   const [keys, setKeys] = useState(null)
   const [loading, setLoading] = useState(true)
   const [balanceRefresh, setBalanceRefresh] = useState(0)
-  const [accountNet, setAccountNet] = useState('testnet')
+  const accountNet = networkView // driven by the global toggle in the header
 
   useEffect(() => {
     if (!supabase) { setLoading(false); return }
@@ -810,22 +810,13 @@ export default function AccountView({ dailyLossLimit, onDailyLossLimitChange }) 
         </button>
       </div>
 
-      {/* Unified Binance section — testnet/mainnet swap via toggle */}
+      {/* Binance section — driven by the global header toggle */}
       <div className="exchange-block">
         <div className="exchange-head">
           <div style={{ fontSize: 15, fontWeight: 600 }}>Binance</div>
-          <div className="net-toggle">
-            <button
-              type="button"
-              className={accountNet === 'testnet' ? 'active' : ''}
-              onClick={() => setAccountNet('testnet')}
-            >TESTNET</button>
-            <button
-              type="button"
-              className={accountNet === 'mainnet' ? 'active' : ''}
-              onClick={() => setAccountNet('mainnet')}
-            >MAINNET</button>
-          </div>
+          <span className={`tag ${accountNet === 'testnet' ? 'tag-testnet' : 'tag-mainnet'}`}>
+            {accountNet === 'testnet' ? 'TESTNET' : 'MAINNET'}
+          </span>
           <span style={{ color: 'var(--mute)', fontSize: 12 }}>
             · {accountNet === 'testnet' ? 'fake money, real API' : 'real money'}
           </span>

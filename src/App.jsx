@@ -76,6 +76,7 @@ export default function App() {
   const [usdtBalance, setUsdtBalance] = useState(null)
   const [dailyLossLimit, setDailyLossLimit] = useState(null)
   const [reconciliationWarnings, setReconciliationWarnings] = useState({})
+  const [networkView, setNetworkView] = useState('testnet')
   useEffect(() => { saveBots(bots) }, [bots])
 
   const coin = coinByPair(pair)
@@ -486,11 +487,14 @@ export default function App() {
   }, [])
 
   // USDT balance polling --------------------------------------------
-  // Pulls the user's real Binance Testnet USDT balance every 60s when
-  // signed in. Silent on auth/network failure; the header just shows "—".
+  // Polls the user's Binance USDT balance every 60s when signed in.
+  // Switches between testnet/mainnet automatically when networkView
+  // changes. Silent on auth/network failure; the header shows "—".
   useEffect(() => {
     if (!supabase) return
     let cancelled = false
+    setUsdtBalance(null)
+    const testnetFlag = networkView === 'testnet' ? 1 : 0
     const load = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
@@ -498,7 +502,7 @@ export default function App() {
           if (!cancelled) setUsdtBalance(null)
           return
         }
-        const r = await authFetch('/api/binance/balance?testnet=1')
+        const r = await authFetch(`/api/binance/balance?testnet=${testnetFlag}`)
         if (!r.ok) return
         const data = await r.json()
         if (cancelled) return
@@ -514,28 +518,35 @@ export default function App() {
       clearInterval(id)
       sub?.subscription?.unsubscribe?.()
     }
-  }, [])
+  }, [networkView])
 
-  // Total unrealised P&L: sum of every open bot's floating P&L.
-  const unrealisedPnL = bots.reduce((sum, bot) => {
+  // Total unrealised P&L: sum of every open bot's floating P&L
+  // (limited to the selected network).
+  const unrealisedPnL = networkBots.reduce((sum, bot) => {
     if (!bot.state.openPosition || !bot.state.lastPrice) return sum
     return sum + floatingPnL(bot.state.openPosition, bot.state.lastPrice)
   }, 0)
-  const anyOpen = bots.some(b => b.state.openPosition)
+  const anyOpen = networkBots.some(b => b.state.openPosition)
 
-  // Safety: today's realized P&L + daily-loss auto-stop ------------
+  // Filtered bots for the currently-selected network view --------
+  const networkBots = useMemo(() => bots.filter(b => {
+    const isTestnet = b.config.testnet !== false
+    return networkView === 'testnet' ? isTestnet : !isTestnet
+  }), [bots, networkView])
+
+  // Safety: today's realized P&L (limited to the selected network) -
   const todayPnL = useMemo(() => {
     const startOfToday = new Date()
     startOfToday.setHours(0, 0, 0, 0)
     const cutoff = startOfToday.getTime()
     let sum = 0
-    for (const bot of bots) {
+    for (const bot of networkBots) {
       for (const t of bot.state.closedTrades) {
         if (t.exitTime > cutoff) sum += t.pnlUSD || 0
       }
     }
     return sum
-  }, [bots])
+  }, [networkBots])
 
   const dailyLimitTriggeredRef = useRef(false)
   useEffect(() => {
@@ -824,18 +835,16 @@ export default function App() {
       <div className="safebar">
         <span className="dot"></span>
         {(() => {
-          const running = bots.filter(b => b.running).length
-          const anyMainnet = bots.some(b => b.running && b.config.testnet === false)
-          if (running === 0) return <>No bots running</>
+          const running = networkBots.filter(b => b.running).length
+          if (running === 0) return <>No bots running on {networkView}</>
           return (
             <>
-              {running} bot{running === 1 ? '' : 's'} running
-              {anyMainnet && <span className="safebar-mainnet"> · MAINNET</span>}
+              {running} bot{running === 1 ? '' : 's'} running ({networkView})
               <button
                 type="button"
                 className="safebar-stop"
                 onClick={handleEmergencyStop}
-                title="Pause every running bot immediately"
+                title="Pause every running bot immediately (all networks)"
               >
                 🛑 PAUSE ALL
               </button>
@@ -859,17 +868,31 @@ export default function App() {
       <div className="wrap">
         <header>
           <h1>Trend Bot</h1>
-          <div className="header-stats">
-            <div className="hstat">
-              <div className="label">USDT balance</div>
-              <div className="value">
-                {usdtBalance == null ? '—' : usdPrecise(usdtBalance)}
-              </div>
+          <div className="header-right">
+            <div className="net-toggle">
+              <button
+                type="button"
+                className={networkView === 'testnet' ? 'active' : ''}
+                onClick={() => setNetworkView('testnet')}
+              >TESTNET</button>
+              <button
+                type="button"
+                className={networkView === 'mainnet' ? 'active' : ''}
+                onClick={() => setNetworkView('mainnet')}
+              >MAINNET</button>
             </div>
-            <div className="hstat">
-              <div className="label">Unrealised P&amp;L</div>
-              <div className={`value ${anyOpen ? (unrealisedPnL >= 0 ? 'pos' : 'neg') : 'mute'}`}>
-                {anyOpen ? signed(unrealisedPnL) : '—'}
+            <div className="header-stats">
+              <div className="hstat">
+                <div className="label">USDT balance ({networkView})</div>
+                <div className="value">
+                  {usdtBalance == null ? '—' : usdPrecise(usdtBalance)}
+                </div>
+              </div>
+              <div className="hstat">
+                <div className="label">Unrealised P&amp;L</div>
+                <div className={`value ${anyOpen ? (unrealisedPnL >= 0 ? 'pos' : 'neg') : 'mute'}`}>
+                  {anyOpen ? signed(unrealisedPnL) : '—'}
+                </div>
               </div>
             </div>
           </div>
@@ -1015,7 +1038,9 @@ export default function App() {
 
         {tab === 'bots' && (
           <TradesView
-            bots={bots}
+            bots={networkBots}
+            allBotsCount={bots.length}
+            networkView={networkView}
             onToggleBot={handleToggleBot}
             onDeleteBot={handleDeleteBot}
             onCloseBotPosition={handleCloseBotPosition}
@@ -1025,6 +1050,7 @@ export default function App() {
 
         {tab === 'account' && (
           <AccountView
+            networkView={networkView}
             dailyLossLimit={dailyLossLimit}
             onDailyLossLimitChange={setDailyLossLimit}
           />

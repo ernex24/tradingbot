@@ -355,15 +355,12 @@ input[type=date] {
   border-bottom: 1px solid var(--line);
   margin-bottom: var(--s4);
 }
-.kpi-net-toggle,
 .net-toggle {
   display: inline-flex;
   border: 1px solid var(--line);
   border-radius: 2px;
   overflow: hidden;
 }
-.kpi-net-toggle { margin-top: var(--s4); }
-.kpi-net-toggle button,
 .net-toggle button {
   background: transparent;
   border: none;
@@ -375,19 +372,22 @@ input[type=date] {
   color: var(--mute);
   cursor: pointer;
 }
-.kpi-net-toggle button:not(:last-child),
 .net-toggle button:not(:last-child) {
   border-right: 1px solid var(--line);
 }
-.kpi-net-toggle button:hover,
 .net-toggle button:hover {
   background: var(--subtle);
   color: var(--ink);
 }
-.kpi-net-toggle button.active,
 .net-toggle button.active {
   background: var(--ink);
   color: #fff;
+}
+.header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--s3);
 }
 .kpi-cell .label {
   font-size: 10px;

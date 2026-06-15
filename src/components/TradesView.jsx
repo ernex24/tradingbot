@@ -651,7 +651,10 @@ function BotCard({ bot, onToggle, onDelete, onCloseBotPosition, reconciliationWa
       <div className="bot-stats">
         <div className="bstat">
           <div className="label">Equity</div>
-          <div className={`num ${cls}`}>{usdPrecise(eq)}</div>
+          <div className={`num ${cls}`}>
+            {pnl > 0 ? '▲ ' : pnl < 0 ? '▼ ' : ''}
+            {usdPrecise(eq)}
+          </div>
           <div className="sub">
             <span className={cls}>{signed(pnl)} ({pct(pnlPct)})</span>
           </div>

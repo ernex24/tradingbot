@@ -864,7 +864,8 @@ export default function App() {
         })()}
         <span className="safebar-pnl">
           today{' '}
-          <span className={todayPnL >= 0 ? 'pos' : 'neg'}>
+          <span className={todayPnL > 0 ? 'pos' : todayPnL < 0 ? 'neg' : ''}>
+            {todayPnL > 0 ? '▲ ' : todayPnL < 0 ? '▼ ' : ''}
             {signed(todayPnL)}
           </span>
           {dailyLossLimit > 0 && (
@@ -901,8 +902,10 @@ export default function App() {
               </div>
               <div className="hstat">
                 <div className="label">Unrealised P&amp;L</div>
-                <div className={`value ${anyOpen ? (unrealisedPnL >= 0 ? 'pos' : 'neg') : 'mute'}`}>
-                  {anyOpen ? signed(unrealisedPnL) : '—'}
+                <div className={`value ${anyOpen ? (unrealisedPnL > 0 ? 'pos' : unrealisedPnL < 0 ? 'neg' : '') : 'mute'}`}>
+                  {anyOpen
+                    ? <>{unrealisedPnL > 0 ? '▲ ' : unrealisedPnL < 0 ? '▼ ' : ''}{signed(unrealisedPnL)}</>
+                    : '—'}
                 </div>
               </div>
             </div>

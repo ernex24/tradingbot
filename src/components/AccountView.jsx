@@ -97,7 +97,7 @@ function BinanceMainnetForm({ onSaved }) {
   return (
     <form onSubmit={submit} className="key-form">
       <div className="key-warn">
-        <b>⚠ REAL MONEY.</b> A leaked key with trade permissions can drain your account.
+        <b>REAL MONEY.</b> A leaked key with trade permissions can drain your account.
         Generate the key at <a href="https://www.binance.com/en/my/settings/api-management" target="_blank" rel="noreferrer">binance.com → API Management</a> with ONLY:
         <ul>
           <li>✅ <b>Enable Spot &amp; Margin Trading</b></li>
@@ -143,8 +143,8 @@ function BinanceMainnetForm({ onSaved }) {
         />
         <span>I understand this key controls real money and that any bot using mainnet will place real orders that can lose real funds.</span>
       </label>
-      <button type="submit" className="btn" disabled={busy || !confirmed} style={{ background: '#991b1b', borderColor: '#991b1b' }}>
-        {busy ? 'Validating with Binance Mainnet…' : 'Connect Binance Mainnet ⚠'}
+      <button type="submit" className="btn" disabled={busy || !confirmed}>
+        {busy ? 'Validating with Binance Mainnet…' : 'Connect Binance Mainnet'}
       </button>
       {err && <div className="warn" style={{ marginTop: 12 }}>{err}</div>}
     </form>
@@ -830,9 +830,6 @@ export default function AccountView({ dailyLossLimit, onDailyLossLimitChange }) 
             <div style={{ marginTop: 'var(--s4)' }}>
               <BinanceBalanceCard testnet={true} refreshKey={balanceRefresh} />
             </div>
-            <div style={{ marginTop: 'var(--s4)' }}>
-              <OrderPanel testnet={true} onAfterFill={() => setBalanceRefresh(k => k + 1)} />
-            </div>
           </>
         ) : (
           <BinanceTestnetForm onSaved={() => refreshKeys()} />
@@ -853,18 +850,15 @@ export default function AccountView({ dailyLossLimit, onDailyLossLimitChange }) 
             <ConnectedHeader
               keyInfo={binanceMainnetKey}
               label="Binance Mainnet"
-              badgeText="MAINNET ⚠"
+              badgeText="MAINNET"
               badgeClass="tag-mainnet"
               onDisconnect={refreshKeys}
             />
             <div className="mainnet-banner">
-              ⚠ Bots created with the MAINNET button will use this key to place real orders.
+              Bots created with the MAINNET button will use this key to place real orders.
             </div>
             <div style={{ marginTop: 'var(--s4)' }}>
               <BinanceBalanceCard testnet={false} refreshKey={balanceRefresh} />
-            </div>
-            <div style={{ marginTop: 'var(--s4)' }}>
-              <OrderPanel testnet={false} onAfterFill={() => setBalanceRefresh(k => k + 1)} />
             </div>
           </>
         ) : (

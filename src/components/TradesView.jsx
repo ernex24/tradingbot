@@ -601,7 +601,7 @@ function BotCard({ bot, onToggle, onDelete, onCloseBotPosition, reconciliationWa
           <div className="bot-name">
             {bot.name}{' '}
             {bot.config.testnet === false
-              ? <span className="tag tag-mainnet">LIVE MAINNET ⚠</span>
+              ? <span className="tag tag-mainnet">LIVE MAINNET</span>
               : <span className="tag tag-testnet">LIVE TESTNET</span>}
           </div>
           <div className="bot-meta">

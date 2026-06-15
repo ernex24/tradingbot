@@ -711,7 +711,7 @@ export default function App() {
         const nextHasOpen = !!next.openPosition
         const prevClosedCount = bot.state.closedTrades.length
         const nextClosedCount = next.closedTrades.length
-        const networkTag = opts.testnet ? 'TESTNET' : '<b>MAINNET ⚠</b>'
+        const networkTag = opts.testnet ? 'TESTNET' : '<b>MAINNET</b>'
         if (!prevHadOpen && nextHasOpen) {
           notify(`🟢 <b>Entry</b> · ${bot.name}\n${networkTag}\nBought ${next.openPosition.qty.toFixed(6)} ${cfg.pair} at ${next.openPosition.entryPrice.toFixed(2)} USDT`)
         }
@@ -830,7 +830,7 @@ export default function App() {
           return (
             <>
               {running} bot{running === 1 ? '' : 's'} running
-              {anyMainnet && <span className="safebar-mainnet"> · MAINNET ⚠</span>}
+              {anyMainnet && <span className="safebar-mainnet"> · MAINNET</span>}
               <button
                 type="button"
                 className="safebar-stop"
@@ -932,10 +932,10 @@ export default function App() {
               <button
                 type="button"
                 className="btn"
-                style={{ background: '#991b1b', borderColor: '#991b1b', marginLeft: 8 }}
+                style={{ marginLeft: 8 }}
                 onClick={() => {
                   const ok = window.confirm(
-                    `⚠ MAINNET BOT — REAL MONEY ⚠\n\n` +
+                    `MAINNET BOT — REAL MONEY\n\n` +
                     `Coin: ${coin.symbol}\n` +
                     `Strategy: ${S.nombre}\n` +
                     `Direction: ${effectiveDirection}\n` +
@@ -955,7 +955,7 @@ export default function App() {
                 }
                 title="Execute this strategy live against Binance MAINNET — REAL MONEY"
               >
-                + Create MAINNET bot ⚠
+                + Create MAINNET bot
               </button>
               <span style={{ color: 'var(--mute)', fontSize: 13, marginLeft: 12 }}>
                 Will be named: <b>{currentConfigLabel}</b>
@@ -1030,10 +1030,6 @@ export default function App() {
           />
         )}
 
-        <footer>
-          Research tool, not financial advice. Demo figures do not predict future performance.
-          Correct order: backtest → paper trading → real capital, and start small.
-        </footer>
       </div>
     </>
   )

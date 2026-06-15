@@ -446,9 +446,11 @@ export default function App() {
 
   const currentConfigLabel = `${coin.symbol} · ${S.nombre} · ${effectiveDirection}`
 
-  const handleCreateBot = () => {
+  const handleCreateBot = (network = 'testnet') => {
     const id = newId()
-    const baseName = currentConfigLabel
+    const isMainnet = network === 'mainnet'
+    const networkSuffix = isMainnet ? ' · MAINNET' : ''
+    const baseName = currentConfigLabel + networkSuffix
     const sameNameCount = bots.filter(b => b.name.startsWith(baseName)).length
     const name = sameNameCount > 0 ? `${baseName} #${sameNameCount + 1}` : baseName
     const bot = {
@@ -464,7 +466,8 @@ export default function App() {
         effectiveDirection,
         stopPct, takePct,
         stake, compound,
-        executor: 'binance-testnet',
+        executor: isMainnet ? 'binance-mainnet' : 'binance-testnet',
+        testnet: !isMainnet,
       },
       state: createInitialState(stake),
     }
@@ -487,14 +490,16 @@ export default function App() {
 
   // Sends a market SELL for the bot's open position. Resolves to the
   // new bot state (with the trade moved to closedTrades) or throws on
-  // API/auth error.
+  // API/auth error. Uses the bot's own testnet flag — backwards-compat
+  // default is true for old bots that don't have it.
   const handleCloseBotPosition = async (id) => {
     const bot = botsRef.current.find(b => b.id === id)
     if (!bot || !bot.state.openPosition) return null
+    const useTestnet = bot.config.testnet !== false
     const newState = await closeOpenPosition(
       bot.state,
       bot.config.pair,
-      true,
+      useTestnet,
       'manual'
     )
     setBots(prev => prev.map(b =>
@@ -567,7 +572,8 @@ export default function App() {
         compound: cfg.compound,
         fixedStake: cfg.stake,
         coin: cfg.pair,
-        testnet: true,
+        // Bots saved before this field existed default to testnet.
+        testnet: cfg.testnet !== false,
       }
       let next
       try {
@@ -735,7 +741,7 @@ export default function App() {
                 type="button"
                 className="btn"
                 style={{ background: '#166534', borderColor: '#166534' }}
-                onClick={handleCreateBot}
+                onClick={() => handleCreateBot('testnet')}
                 disabled={
                   !!paramError || !!rangeWarn ||
                   !executorSupportsCoin(coin.symbol) ||
@@ -744,13 +750,41 @@ export default function App() {
                 title={
                   paramError || rangeWarn ? 'Fix the warnings first' :
                   !executorSupportsCoin(coin.symbol)
-                    ? `${coin.symbol} is backtest-only — not available on Binance Spot Testnet`
+                    ? `${coin.symbol} is not available on Binance Spot`
                     : effectiveDirection !== 'long'
-                      ? 'Binance Spot Testnet only supports long positions'
-                      : 'Execute this strategy live against Binance Testnet'
+                      ? 'Binance Spot only supports long positions'
+                      : 'Execute this strategy live against Binance Testnet (fake money)'
                 }
               >
-                + Create live Testnet bot
+                + Create Testnet bot
+              </button>
+              <button
+                type="button"
+                className="btn"
+                style={{ background: '#991b1b', borderColor: '#991b1b', marginLeft: 8 }}
+                onClick={() => {
+                  const ok = window.confirm(
+                    `⚠ MAINNET BOT — REAL MONEY ⚠\n\n` +
+                    `Coin: ${coin.symbol}\n` +
+                    `Strategy: ${S.nombre}\n` +
+                    `Direction: ${effectiveDirection}\n` +
+                    `Amount: ${stake} USDT\n` +
+                    (stopPct > 0 ? `Stop loss: ${stopPct}%\n` : '') +
+                    (takePct > 0 ? `Take profit: ${takePct}%\n` : '') +
+                    `\nThis bot will place REAL orders on Binance.com using your ` +
+                    `mainnet key. Losses are real and not recoverable. ` +
+                    `\n\nProceed?`
+                  )
+                  if (ok) handleCreateBot('mainnet')
+                }}
+                disabled={
+                  !!paramError || !!rangeWarn ||
+                  !executorSupportsCoin(coin.symbol) ||
+                  effectiveDirection !== 'long'
+                }
+                title="Execute this strategy live against Binance MAINNET — REAL MONEY"
+              >
+                + Create MAINNET bot ⚠
               </button>
               <span style={{ color: 'var(--mute)', fontSize: 13, marginLeft: 12 }}>
                 Will be named: <b>{currentConfigLabel}</b>

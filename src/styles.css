@@ -641,6 +641,17 @@ input[type=date] {
 .tag-src-hyperliquid { background: #def4ec; color: #0e6b46; }
 .tag-testnet { background: #ddf3e2; color: #166534; }
 .tag-real { background: #fbe0e0; color: #991b1b; }
+.tag-mainnet { background: #991b1b; color: #fff; padding: 3px 8px; font-weight: 700; }
+.mainnet-banner {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 10px var(--s3);
+  font-size: 13px;
+  margin-top: var(--s3);
+  border-radius: 2px;
+  font-weight: 500;
+}
 
 .chart-wrapper {
   position: relative;

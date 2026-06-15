@@ -63,6 +63,87 @@ function LoginPanel({ onSession }) {
   )
 }
 
+function BinanceMainnetForm({ onSaved }) {
+  const [apiKey, setApiKey] = useState('')
+  const [apiSecret, setApiSecret] = useState('')
+  const [confirmed, setConfirmed] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setErr(''); setBusy(true)
+    try {
+      const r = await authFetch('/api/keys/save', {
+        method: 'POST',
+        body: JSON.stringify({
+          exchange: 'binance',
+          testnet: false,
+          apiKey, apiSecret,
+          permissions: ['Spot Trading (mainnet)'],
+        }),
+      })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data.error || 'failed to save')
+      onSaved(data)
+      setApiKey(''); setApiSecret('')
+    } catch (e) {
+      setErr(e.message || String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="key-form">
+      <div className="key-warn">
+        <b>⚠ REAL MONEY.</b> A leaked key with trade permissions can drain your account.
+        Generate the key at <a href="https://www.binance.com/en/my/settings/api-management" target="_blank" rel="noreferrer">binance.com → API Management</a> with ONLY:
+        <ul>
+          <li>✅ <b>Enable Spot &amp; Margin Trading</b></li>
+          <li>✅ <b>Enable Reading</b> (default)</li>
+          <li>❌ <b>NEVER</b> enable Withdrawals — worst case is someone tradeing your account, not draining it</li>
+          <li>✅ Strongly recommended: IP whitelist <code>76.76.21.0/24</code> (Vercel Frankfurt)</li>
+        </ul>
+        Binance.com is not available in the US. If you're in the US, your only Binance option is Binance.US (different API).
+      </div>
+
+      <label>
+        API Key
+        <input
+          type="text"
+          value={apiKey}
+          onChange={e => setApiKey(e.target.value)}
+          autoComplete="off"
+          required
+        />
+      </label>
+      <label>
+        Secret Key <InfoTip>Encrypted with AES-256-GCM before storage. Validated by calling /api/v3/account on mainnet.</InfoTip>
+        <input
+          type="password"
+          value={apiSecret}
+          onChange={e => setApiSecret(e.target.value)}
+          autoComplete="off"
+          required
+        />
+      </label>
+      <label className="toggle">
+        <input
+          type="checkbox"
+          checked={confirmed}
+          onChange={e => setConfirmed(e.target.checked)}
+        />
+        <span>I understand this key controls real money and that any bot using mainnet will place real orders that can lose real funds.</span>
+      </label>
+      <button type="submit" className="btn" disabled={busy || !confirmed} style={{ background: '#991b1b', borderColor: '#991b1b' }}>
+        {busy ? 'Validating with Binance Mainnet…' : 'Connect Binance Mainnet ⚠'}
+      </button>
+      {err && <div className="warn" style={{ marginTop: 12 }}>{err}</div>}
+    </form>
+  )
+}
+
 function BinanceTestnetForm({ onSaved }) {
   const [apiKey, setApiKey] = useState('')
   const [apiSecret, setApiSecret] = useState('')
@@ -549,6 +630,7 @@ export default function AccountView() {
   }
 
   const binanceTestnetKey = (keys || []).find(k => k.exchange === 'binance' && k.testnet)
+  const binanceMainnetKey = (keys || []).find(k => k.exchange === 'binance' && !k.testnet)
 
   return (
     <div className="account-view">
@@ -594,6 +676,38 @@ export default function AccountView() {
         )}
       </div>
 
+      {/* Binance Mainnet — REAL MONEY */}
+      <div className="exchange-block">
+        <div className="exchange-head">
+          <div style={{ fontSize: 15, fontWeight: 600 }}>Binance</div>
+          <span className="tag tag-mainnet">MAINNET</span>
+          <span style={{ color: 'var(--mute)', fontSize: 12 }}>· real money</span>
+        </div>
+        {keys === null ? (
+          <div style={{ color: 'var(--mute)' }}>Loading…</div>
+        ) : binanceMainnetKey ? (
+          <>
+            <ConnectedHeader
+              keyInfo={binanceMainnetKey}
+              label="Binance Mainnet"
+              badgeText="MAINNET ⚠"
+              badgeClass="tag-mainnet"
+              onDisconnect={refreshKeys}
+            />
+            <div className="mainnet-banner">
+              ⚠ Bots created with the MAINNET button will use this key to place real orders.
+            </div>
+            <div style={{ marginTop: 'var(--s4)' }}>
+              <BinanceBalanceCard testnet={false} refreshKey={balanceRefresh} />
+            </div>
+            <div style={{ marginTop: 'var(--s4)' }}>
+              <OrderPanel testnet={false} onAfterFill={() => setBalanceRefresh(k => k + 1)} />
+            </div>
+          </>
+        ) : (
+          <BinanceMainnetForm onSaved={() => refreshKeys()} />
+        )}
+      </div>
     </div>
   )
 }

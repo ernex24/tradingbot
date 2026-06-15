@@ -599,7 +599,10 @@ function BotCard({ bot, onToggle, onDelete, onCloseBotPosition }) {
       <div className="bot-head">
         <div>
           <div className="bot-name">
-            {bot.name} <span className="tag tag-testnet">LIVE TESTNET</span>
+            {bot.name}{' '}
+            {bot.config.testnet === false
+              ? <span className="tag tag-mainnet">LIVE MAINNET ⚠</span>
+              : <span className="tag tag-testnet">LIVE TESTNET</span>}
           </div>
           <div className="bot-meta">
             {coin.symbol} · {config.interval} · {S.nombre} · {config.effectiveDirection}

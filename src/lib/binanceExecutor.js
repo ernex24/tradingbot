@@ -114,7 +114,10 @@ export async function closeOpenPosition(state, coin, testnet, reason = 'manual')
 export async function executeTick(state, signal, currentPrice, currentCandle, currentTime, opts) {
   const {
     stopPct = 0, takePct = 0, compound = true,
-    fixedStake = state.startBalance, coin, testnet = true,
+    fixedStake = state.startBalance, coin,
+    // SAFETY: testnet defaults to true. Mainnet bots MUST explicitly
+    // pass testnet:false. A missing flag never costs real money.
+    testnet = true,
   } = opts
 
   const symbol = symbolFor(coin)

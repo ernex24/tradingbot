@@ -520,6 +520,12 @@ export default function App() {
     }
   }, [networkView])
 
+  // Filtered bots for the currently-selected network view --------
+  const networkBots = useMemo(() => bots.filter(b => {
+    const isTestnet = b.config.testnet !== false
+    return networkView === 'testnet' ? isTestnet : !isTestnet
+  }), [bots, networkView])
+
   // Total unrealised P&L: sum of every open bot's floating P&L
   // (limited to the selected network).
   const unrealisedPnL = networkBots.reduce((sum, bot) => {
@@ -527,12 +533,6 @@ export default function App() {
     return sum + floatingPnL(bot.state.openPosition, bot.state.lastPrice)
   }, 0)
   const anyOpen = networkBots.some(b => b.state.openPosition)
-
-  // Filtered bots for the currently-selected network view --------
-  const networkBots = useMemo(() => bots.filter(b => {
-    const isTestnet = b.config.testnet !== false
-    return networkView === 'testnet' ? isTestnet : !isTestnet
-  }), [bots, networkView])
 
   // Safety: today's realized P&L (limited to the selected network) -
   const todayPnL = useMemo(() => {

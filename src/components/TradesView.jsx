@@ -1,10 +1,111 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { equity, floatingPnL } from '../lib/paperTrader.js'
 import { price, usdPrecise, signed, pct, qty as fmtQty } from '../lib/format.js'
 import { coinByPair } from '../lib/coins.js'
 import { STRATS } from '../lib/strategies.js'
 import { COM } from '../lib/backtest.js'
 import PriceChart from './PriceChart.jsx'
+
+function computeTotals(bots) {
+  return bots.reduce((acc, bot) => {
+    for (const t of bot.state.closedTrades) {
+      acc.invested += t.invested
+      acc.fees += t.feeUSD || 0
+      acc.pnl += t.pnlUSD
+      acc.trades += 1
+      if (t.pnlUSD > 0) acc.wins += 1
+    }
+    if (bot.state.openPosition) {
+      acc.openInvested += bot.state.openPosition.invested
+      acc.openCount += 1
+      if (bot.state.lastPrice) {
+        acc.openFloating += floatingPnL(bot.state.openPosition, bot.state.lastPrice)
+      }
+    }
+    acc.startBalance += bot.state.startBalance
+    return acc
+  }, {
+    invested: 0, fees: 0, pnl: 0, trades: 0, wins: 0,
+    openInvested: 0, openCount: 0, openFloating: 0,
+    startBalance: 0,
+  })
+}
+
+function KPIRibbon({ totals }) {
+  const losses = totals.trades - totals.wins
+  const winRate = totals.trades > 0 ? (totals.wins / totals.trades) * 100 : 0
+  const realizedReturnPct = totals.startBalance > 0
+    ? (totals.pnl / totals.startBalance) * 100
+    : 0
+  const netCls = totals.pnl >= 0 ? 'pos' : 'neg'
+  const floatCls = totals.openFloating >= 0 ? 'pos' : 'neg'
+
+  return (
+    <div className="kpi-ribbon">
+      <div className="kpi-cell">
+        <div className="label">Realized P&amp;L</div>
+        <div className={`value ${netCls}`}>{signed(totals.pnl)}</div>
+        <div className="sub">{pct(realizedReturnPct)}</div>
+      </div>
+      <div className="kpi-cell">
+        <div className="label">Closed trades</div>
+        <div className="value">{totals.trades}</div>
+        <div className="sub">{totals.wins}W / {losses}L · {winRate.toFixed(0)}% win rate</div>
+      </div>
+      <div className="kpi-cell">
+        <div className="label">Total invested</div>
+        <div className="value">{usdPrecise(totals.invested)}</div>
+      </div>
+      <div className="kpi-cell">
+        <div className="label">Total fees</div>
+        <div className="value mute">{usdPrecise(totals.fees)}</div>
+      </div>
+      <div className="kpi-cell">
+        <div className="label">Open · floating</div>
+        <div className={`value ${totals.openCount > 0 ? floatCls : 'mute'}`}>
+          {totals.openCount > 0 ? signed(totals.openFloating) : '—'}
+        </div>
+        <div className="sub">{totals.openCount} open</div>
+      </div>
+    </div>
+  )
+}
+
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'open', label: 'Open positions first' },
+  { value: 'closed_count', label: 'Most closed trades' },
+  { value: 'pnl_best', label: 'Best P&L' },
+  { value: 'pnl_worst', label: 'Worst P&L' },
+]
+
+function sortBots(bots, sortBy) {
+  const pnlOf = (b) => b.state.closedTrades.reduce((s, t) => s + (t.pnlUSD || 0), 0)
+  const out = [...bots]
+  switch (sortBy) {
+    case 'oldest':
+      return out.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
+    case 'open':
+      return out.sort((a, b) => {
+        const aOpen = a.state.openPosition ? 1 : 0
+        const bOpen = b.state.openPosition ? 1 : 0
+        if (aOpen !== bOpen) return bOpen - aOpen
+        return (b.createdAt || 0) - (a.createdAt || 0)
+      })
+    case 'closed_count':
+      return out.sort((a, b) =>
+        b.state.closedTrades.length - a.state.closedTrades.length
+      )
+    case 'pnl_best':
+      return out.sort((a, b) => pnlOf(b) - pnlOf(a))
+    case 'pnl_worst':
+      return out.sort((a, b) => pnlOf(a) - pnlOf(b))
+    case 'newest':
+    default:
+      return out.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+  }
+}
 
 const CHART_VISIBLE = 150
 
@@ -617,30 +718,7 @@ function BotCard({ bot, onToggle, onDelete, onCloseBotPosition }) {
   )
 }
 
-function TotalsCard({ bots }) {
-  const totals = bots.reduce((acc, bot) => {
-    for (const t of bot.state.closedTrades) {
-      acc.invested += t.invested
-      acc.fees += t.feeUSD || 0
-      acc.pnl += t.pnlUSD
-      acc.trades += 1
-      if (t.pnlUSD > 0) acc.wins += 1
-    }
-    if (bot.state.openPosition) {
-      acc.openInvested += bot.state.openPosition.invested
-      acc.openCount += 1
-      if (bot.state.lastPrice) {
-        acc.openFloating += floatingPnL(bot.state.openPosition, bot.state.lastPrice)
-      }
-    }
-    acc.startBalance += bot.state.startBalance
-    return acc
-  }, {
-    invested: 0, fees: 0, pnl: 0, trades: 0, wins: 0,
-    openInvested: 0, openCount: 0, openFloating: 0,
-    startBalance: 0,
-  })
-
+function TotalsCard({ totals, botCount }) {
   const losses = totals.trades - totals.wins
   const winRate = totals.trades > 0 ? (totals.wins / totals.trades) * 100 : 0
   const realizedReturnPct = totals.startBalance > 0
@@ -652,7 +730,7 @@ function TotalsCard({ bots }) {
   return (
     <div className="totals-card">
       <div className="label" style={{ marginBottom: 'var(--s3)' }}>
-        Totals across all bots ({bots.length})
+        Totals across all bots ({botCount})
       </div>
       <table className="totals-table">
         <tbody>
@@ -701,8 +779,14 @@ function TotalsCard({ bots }) {
 }
 
 export default function TradesView({ bots, onToggleBot, onDeleteBot, onCloseBotPosition }) {
+  const [sortBy, setSortBy] = useState('newest')
+  const totals = useMemo(() => computeTotals(bots), [bots])
+  const sortedBots = useMemo(() => sortBots(bots, sortBy), [bots, sortBy])
+
   return (
     <div className="trades-view">
+      {bots.length > 0 && <KPIRibbon totals={totals} />}
+
       <div className="trades-head">
         <div>
           <div className="label">Active bots</div>
@@ -712,25 +796,39 @@ export default function TradesView({ bots, onToggleBot, onDeleteBot, onCloseBotP
               : `${bots.length} ${bots.length === 1 ? 'bot' : 'bots'} · streaming live from Binance Testnet`}
           </div>
         </div>
+        {bots.length > 1 && (
+          <div className="ctl">
+            <label htmlFor="sortby" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--mute)' }}>
+              Sort by
+            </label>
+            <select
+              id="sortby"
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+            >
+              {SORT_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {bots.length > 0 && (
         <div className="bot-list">
-          {[...bots]
-            .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-            .map(b => (
-              <BotCard
-                key={b.id}
-                bot={b}
-                onToggle={onToggleBot}
-                onDelete={onDeleteBot}
-                onCloseBotPosition={onCloseBotPosition}
-              />
-            ))}
+          {sortedBots.map(b => (
+            <BotCard
+              key={b.id}
+              bot={b}
+              onToggle={onToggleBot}
+              onDelete={onDeleteBot}
+              onCloseBotPosition={onCloseBotPosition}
+            />
+          ))}
         </div>
       )}
 
-      {bots.length > 0 && <TotalsCard bots={bots} />}
+      {bots.length > 0 && <TotalsCard totals={totals} botCount={bots.length} />}
     </div>
   )
 }

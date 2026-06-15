@@ -8,6 +8,7 @@ import { executeTick as binanceTick, executorSupportsCoin, closeOpenPosition } f
 import { binanceStream } from './lib/binanceStream.js'
 import { supabase, authFetch } from './lib/supabase.js'
 import { usdPrecise, signed } from './lib/format.js'
+import { usePath, pathToTab, tabToPath } from './lib/router.js'
 import Tabs from './components/Tabs.jsx'
 import Controls from './components/Controls.jsx'
 import KPIs from './components/KPIs.jsx'
@@ -51,7 +52,9 @@ function newId() {
 }
 
 export default function App() {
-  const [tab, setTab] = useState('backtest')
+  const [path, navigate] = usePath()
+  const tab = pathToTab(path)
+  const setTab = (next) => navigate(tabToPath(next))
 
   const [candles, setCandles] = useState(DEMO_CANDLES)
   const [dataSrc, setDataSrc] = useState('loading live data…')

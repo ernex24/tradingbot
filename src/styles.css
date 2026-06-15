@@ -293,6 +293,39 @@ input[type=date] {
 .trades-view {
   padding: var(--s4) 0 var(--s6);
 }
+.kpi-ribbon {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--s4);
+  padding: var(--s4) 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--s4);
+}
+.kpi-cell .label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--mute);
+  font-weight: 500;
+}
+.kpi-cell .value {
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  margin-top: 6px;
+}
+.kpi-cell .value.pos { color: var(--pos); }
+.kpi-cell .value.neg { color: var(--neg); }
+.kpi-cell .value.mute { color: var(--mute); }
+.kpi-cell .sub {
+  font-size: 12px;
+  color: var(--mute);
+  margin-top: 2px;
+}
+@media (max-width: 760px) {
+  .kpi-ribbon { grid-template-columns: 1fr 1fr; gap: var(--s3); }
+}
 .trades-head {
   display: flex;
   justify-content: space-between;

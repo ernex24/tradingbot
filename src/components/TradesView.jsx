@@ -817,7 +817,7 @@ export default function TradesView({
             {allBotsCount === 0
               ? 'No bots yet. Configure a strategy in the Backtest tab and click "Create Testnet bot".'
               : bots.length === 0
-                ? `No ${networkView} bots yet (${allBotsCount} on the other network).`
+                ? `No ${networkView} bots yet.`
                 : `${bots.length} of ${allBotsCount} ${allBotsCount === 1 ? 'bot' : 'bots'} shown · ${networkView} only`}
           </div>
         </div>

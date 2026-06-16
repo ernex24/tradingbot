@@ -219,6 +219,7 @@ export default function App() {
           config: bot.config,
           state: bot.state,
           running: bot.running,
+          serverManaged: bot.serverManaged !== false,
         }),
       })
     } catch { /* ignore */ }
@@ -299,6 +300,7 @@ export default function App() {
               name: db.name,
               createdAt: db.createdAt,
               running: db.running,
+              serverManaged: db.serverManaged !== false,
               config: db.config,
               state: {
                 ...db.state,
@@ -326,7 +328,17 @@ export default function App() {
     }
     supabase.auth.getSession().then(({ data }) => load(data.session))
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => load(s))
-    return () => { cancelled = true; sub?.subscription?.unsubscribe?.() }
+    // Re-poll bot state every 20s so cron-driven changes (server-managed
+    // bots) surface in the UI without a manual refresh.
+    const poll = setInterval(async () => {
+      const { data } = await supabase.auth.getSession()
+      load(data.session)
+    }, 20_000)
+    return () => {
+      cancelled = true
+      clearInterval(poll)
+      sub?.subscription?.unsubscribe?.()
+    }
   }, [])
 
   // Closed-trade persistence ----------------------------------------
@@ -617,6 +629,7 @@ export default function App() {
       name,
       createdAt: Date.now(),
       running: true,
+      serverManaged: true,
       config: {
         pair, source: 'binance', interval,
         stratKey,
@@ -831,6 +844,9 @@ export default function App() {
 
     for (const bot of botsRef.current) {
       if (!bot.running) continue
+      // Server-managed bots tick from the cron endpoint, not the browser.
+      // The browser only renders their state, polled from Supabase.
+      if (bot.serverManaged !== false) continue
       if (bot.config.source === 'binance') setupStream(bot)
       else setupPoll(bot)
     }

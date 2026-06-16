@@ -379,15 +379,31 @@ export default async function handler(req, res) {
     } catch (e) {
       const msg = String(e?.message || e)
       console.error(`bot ${id} tick error:`, msg)
+      // Auto-pause on errors that can never recover by retrying.
+      // These all mean "the current config is incompatible with the
+      // account state". Re-trying every minute just spams Binance and
+      // the bot card with the same error. Pause and Telegram the user
+      // so they intervene.
+      const fatal = /insufficient balance|Filter failure: NOTIONAL|Filter failure: LOT_SIZE|Filter failure: MIN_NOTIONAL|Invalid API-key|permissions for action/i.test(msg)
+      const update = {
+        state: { ...(row.state || {}), lastError: msg, lastTickAt: Date.now() },
+        updated_at: new Date().toISOString(),
+      }
+      if (fatal) update.running = false
       await admin
         .from('user_bots')
-        .update({
-          state: { ...(row.state || {}), lastError: msg, lastTickAt: Date.now() },
-          updated_at: new Date().toISOString(),
-        })
+        .update(update)
         .eq('user_id', row.user_id)
         .eq('client_id', id)
-      results.push({ id, error: msg })
+      if (fatal) {
+        const networkTag = row.config?.testnet === false ? '<b>MAINNET</b>' : 'TESTNET'
+        await sendTelegram(
+          admin,
+          row.user_id,
+          `🛑 <b>Bot paused</b> · ${row.name}\n${networkTag}\n${msg}\n\nFix the config or top up the wallet, then resume the bot.`,
+        )
+      }
+      results.push({ id, error: msg, paused: !!fatal })
     }
   }
 

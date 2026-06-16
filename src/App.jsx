@@ -276,8 +276,16 @@ export default function App() {
       try {
         const r = await authFetch('/api/bots/list')
         if (!r.ok) return
-        const { bots: dbBots = [] } = await r.json()
+        const { bots: dbBotsRaw = [] } = await r.json()
         if (cancelled) return
+
+        // Drop tombstoned IDs (recently deleted, DB delete maybe not
+        // observed yet) and expire stale tombstones.
+        const now = Date.now()
+        for (const [tid, expiry] of deletedIds.current) {
+          if (expiry < now) deletedIds.current.delete(tid)
+        }
+        const dbBots = dbBotsRaw.filter(b => !deletedIds.current.has(b.id))
 
         const dbMap = new Map(dbBots.map(b => [b.id, b]))
         setBots(prev => {
@@ -649,14 +657,25 @@ export default function App() {
   const handleToggleBot = (id) => {
     setBots(prev => prev.map(b => b.id === id ? { ...b, running: !b.running } : b))
   }
-  const handleDeleteBot = (id) => {
+  // Tombstones suppress recently-deleted bot IDs so the 20s Supabase
+  // poll can't resurrect them before the DB delete is observed.
+  // 5-minute TTL is generous; any DB delete completes in <1s in practice.
+  const deletedIds = useRef(new Map())
+
+  const handleDeleteBot = async (id) => {
+    deletedIds.current.set(id, Date.now() + 5 * 60 * 1000)
     setBots(prev => prev.filter(b => b.id !== id))
-    // Also delete from DB if authenticated. Fire and forget.
     if (supabase) {
-      authFetch('/api/bots/delete', {
-        method: 'POST',
-        body: JSON.stringify({ id }),
-      }).catch(() => {})
+      try {
+        const r = await authFetch('/api/bots/delete', {
+          method: 'POST',
+          body: JSON.stringify({ id }),
+        })
+        if (!r.ok) throw new Error(`delete ${r.status}`)
+      } catch (e) {
+        alert(`Could not delete bot from server: ${e?.message || e}\n\nThe bot may still be running on the server. Refresh in a minute and try Delete again.`)
+        deletedIds.current.delete(id)
+      }
     }
   }
 

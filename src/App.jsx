@@ -1159,6 +1159,10 @@ export default function App() {
           compound={compound}
           stopPct={stopPct}
           takePct={takePct}
+          existingCommitment={bots
+            .filter(b => b.running && (b.config.testnet !== false) === (pendingCreate.network === 'testnet'))
+            .reduce((sum, b) => sum + (+b.config.stake || 0), 0)}
+          runningBotCount={bots.filter(b => b.running && (b.config.testnet !== false) === (pendingCreate.network === 'testnet')).length}
           onCancel={() => setPendingCreate(null)}
           onConfirm={() => {
             const net = pendingCreate.network
@@ -1174,9 +1178,40 @@ export default function App() {
 function CreateBotConfirm({
   network, coinSymbol, stratName, interval, direction,
   stake, compound, stopPct, takePct,
+  existingCommitment, runningBotCount,
   onConfirm, onCancel,
 }) {
   const isMainnet = network === 'mainnet'
+  // balance: null = loading, false = no key / error, number = USDT total
+  const [balance, setBalance] = useState(null)
+  const [balanceError, setBalanceError] = useState('')
+  useEffect(() => {
+    let cancelled = false
+    const flag = isMainnet ? 0 : 1
+    ;(async () => {
+      try {
+        const r = await authFetch(`/api/binance/balance?testnet=${flag}`)
+        const data = await r.json().catch(() => ({}))
+        if (cancelled) return
+        if (!r.ok) {
+          setBalance(false)
+          setBalanceError(data?.error || `HTTP ${r.status}`)
+          return
+        }
+        const usdt = (data.balances || []).find(b => b.asset === 'USDT')
+        setBalance(usdt ? usdt.total : 0)
+      } catch (e) {
+        if (!cancelled) {
+          setBalance(false)
+          setBalanceError(String(e?.message || e))
+        }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [isMainnet])
+  const projected = (existingCommitment || 0) + (+stake || 0)
+  const overBudget = typeof balance === 'number' && projected > balance
+  const shortfall = overBudget ? projected - balance : 0
   return (
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal create-confirm" onClick={e => e.stopPropagation()}>
@@ -1210,6 +1245,52 @@ function CreateBotConfirm({
               </tr>
             </tbody>
           </table>
+
+          <div className="create-confirm-budget">
+            <div className="label" style={{ marginBottom: 6 }}>
+              {isMainnet ? 'Mainnet' : 'Testnet'} USDT budget
+            </div>
+            <table className="create-confirm-table" style={{ fontSize: 13 }}>
+              <tbody>
+                <tr>
+                  <td>Wallet USDT</td>
+                  <td>
+                    {balance === null && <span style={{ color: 'var(--mute)' }}>checking…</span>}
+                    {balance === false && <span style={{ color: 'var(--mute)' }}>—</span>}
+                    {typeof balance === 'number' && usdPrecise(balance)}
+                  </td>
+                </tr>
+                <tr>
+                  <td>Already committed ({runningBotCount} bot{runningBotCount === 1 ? '' : 's'})</td>
+                  <td>{usdPrecise(existingCommitment || 0)}</td>
+                </tr>
+                <tr>
+                  <td>This bot</td>
+                  <td>{usdPrecise(+stake || 0)}</td>
+                </tr>
+                <tr>
+                  <td><b>Total after creation</b></td>
+                  <td className={overBudget ? 'neg' : ''}>
+                    <b>{usdPrecise(projected)}</b>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            {balance === false && (
+              <p className="create-confirm-info">
+                Couldn't read the {isMainnet ? 'mainnet' : 'testnet'} balance ({balanceError || 'no API key'}).
+                Creating the bot anyway is fine — it'll show the error on its card if the wallet is short.
+              </p>
+            )}
+            {overBudget && (
+              <p className="create-confirm-warn">
+                <b>Over budget by {usdPrecise(shortfall)}.</b>{' '}
+                The combined investment of all your running {isMainnet ? 'mainnet' : 'testnet'} bots will exceed your USDT balance.
+                When this bot tries to enter a position it'll fail with <i>insufficient balance</i> until you top up or pause another bot.
+              </p>
+            )}
+          </div>
+
           {isMainnet && (
             <p className="create-confirm-warn">
               This bot will place <b>real orders</b> on Binance.com using your mainnet API key.

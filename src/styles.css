@@ -1505,6 +1505,20 @@ footer {
   font-size: 13px;
   color: var(--neg);
 }
+.create-confirm-info {
+  margin-top: var(--s3);
+  padding: 10px 12px;
+  background: var(--subtle);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font-size: 12px;
+  color: var(--mute);
+}
+.create-confirm-budget {
+  margin-top: var(--s3);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--line);
+}
 [data-theme="dark"] .create-confirm-warn {
   background: rgba(248,81,73,0.12);
   border-color: rgba(248,81,73,0.35);

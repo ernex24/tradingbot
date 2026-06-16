@@ -78,6 +78,7 @@ export default function App() {
   const [reconciliationWarnings, setReconciliationWarnings] = useState({})
   const [networkView, setNetworkView] = useState('testnet')
   const [backtestStarted, setBacktestStarted] = useState(false)
+  const [pendingCreate, setPendingCreate] = useState(null)
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'light'
     return localStorage.getItem('trendbot.theme') || 'light'
@@ -971,7 +972,7 @@ export default function App() {
                 type="button"
                 className="btn"
                 style={{ background: '#166534', borderColor: '#166534' }}
-                onClick={() => handleCreateBot('testnet')}
+                onClick={() => setPendingCreate({ network: 'testnet' })}
                 disabled={
                   !!paramError || !!rangeWarn ||
                   !executorSupportsCoin(coin.symbol) ||
@@ -992,21 +993,7 @@ export default function App() {
                 type="button"
                 className="btn"
                 style={{ marginLeft: 8 }}
-                onClick={() => {
-                  const ok = window.confirm(
-                    `MAINNET BOT — REAL MONEY\n\n` +
-                    `Coin: ${coin.symbol}\n` +
-                    `Strategy: ${S.nombre}\n` +
-                    `Direction: ${effectiveDirection}\n` +
-                    `Amount: ${stake} USDT\n` +
-                    (stopPct > 0 ? `Stop loss: ${stopPct}%\n` : '') +
-                    (takePct > 0 ? `Take profit: ${takePct}%\n` : '') +
-                    `\nThis bot will place REAL orders on Binance.com using your ` +
-                    `mainnet key. Losses are real and not recoverable. ` +
-                    `\n\nProceed?`
-                  )
-                  if (ok) handleCreateBot('mainnet')
-                }}
+                onClick={() => setPendingCreate({ network: 'mainnet' })}
                 disabled={
                   !!paramError || !!rangeWarn ||
                   !executorSupportsCoin(coin.symbol) ||
@@ -1103,6 +1090,90 @@ export default function App() {
         )}
 
       </div>
+
+      {pendingCreate && (
+        <CreateBotConfirm
+          network={pendingCreate.network}
+          coinSymbol={coin.symbol}
+          stratName={S.nombre}
+          interval={interval}
+          direction={effectiveDirection}
+          stake={stake}
+          compound={compound}
+          stopPct={stopPct}
+          takePct={takePct}
+          onCancel={() => setPendingCreate(null)}
+          onConfirm={() => {
+            const net = pendingCreate.network
+            setPendingCreate(null)
+            handleCreateBot(net)
+          }}
+        />
+      )}
     </>
+  )
+}
+
+function CreateBotConfirm({
+  network, coinSymbol, stratName, interval, direction,
+  stake, compound, stopPct, takePct,
+  onConfirm, onCancel,
+}) {
+  const isMainnet = network === 'mainnet'
+  return (
+    <div className="modal-backdrop" onClick={onCancel}>
+      <div className="modal create-confirm" onClick={e => e.stopPropagation()}>
+        <div className={`create-confirm-banner ${isMainnet ? 'mainnet' : 'testnet'}`}>
+          {isMainnet ? 'MAINNET — REAL MONEY' : 'TESTNET — DEMO MONEY'}
+        </div>
+        <h3 className="modal-title" style={{ marginTop: 0 }}>
+          Create {isMainnet ? 'mainnet' : 'testnet'} bot on {coinSymbol}/USDT?
+        </h3>
+        <div className="modal-body">
+          <table className="create-confirm-table">
+            <tbody>
+              <tr><td>Strategy</td><td>{stratName}</td></tr>
+              <tr><td>Direction</td><td style={{ textTransform: 'capitalize' }}>{direction}</td></tr>
+              <tr><td>Timeframe</td><td>{interval}</td></tr>
+              <tr>
+                <td>Investment</td>
+                <td><b>{stake.toLocaleString('en-US')} USDT</b></td>
+              </tr>
+              <tr>
+                <td>Stop loss</td>
+                <td>{stopPct > 0 ? `${stopPct}%` : 'off'}</td>
+              </tr>
+              <tr>
+                <td>Take profit</td>
+                <td>{takePct > 0 ? `${takePct}%` : 'off'}</td>
+              </tr>
+              <tr>
+                <td>Reinvest profits</td>
+                <td>{compound ? 'Compounding' : 'Fixed size'}</td>
+              </tr>
+            </tbody>
+          </table>
+          {isMainnet && (
+            <p className="create-confirm-warn">
+              This bot will place <b>real orders</b> on Binance.com using your mainnet API key.
+              Losses are real and not recoverable.
+            </p>
+          )}
+        </div>
+        <div className="modal-actions">
+          <button
+            type="button"
+            className="btn"
+            onClick={onConfirm}
+            style={isMainnet
+              ? { background: 'var(--neg)', borderColor: 'var(--neg)' }
+              : { background: '#166534', borderColor: '#166534' }}
+          >
+            {isMainnet ? 'Confirm — create MAINNET bot' : 'Create testnet bot'}
+          </button>
+          <button type="button" className="btn-ghost" onClick={onCancel}>Cancel</button>
+        </div>
+      </div>
+    </div>
   )
 }

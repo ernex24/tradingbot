@@ -1456,6 +1456,62 @@ footer {
 /* Modal backdrop a touch darker */
 [data-theme="dark"] .modal-backdrop { background: rgba(0,0,0,0.72); }
 
+/* Create-bot confirmation modal */
+.create-confirm { max-width: 460px; }
+.create-confirm-banner {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  text-align: center;
+  padding: 8px 12px;
+  border-radius: 2px;
+  margin: 0 0 var(--s3);
+}
+.create-confirm-banner.testnet {
+  background: #166534;
+  color: #fff;
+}
+.create-confirm-banner.mainnet {
+  background: var(--neg);
+  color: #fff;
+}
+.create-confirm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.create-confirm-table td {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.create-confirm-table td:first-child {
+  color: var(--mute);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  width: 45%;
+}
+.create-confirm-table td:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.create-confirm-table tr:last-child td { border-bottom: none; }
+.create-confirm-warn {
+  margin-top: var(--s3);
+  padding: 10px 12px;
+  background: rgba(192,57,43,0.08);
+  border: 1px solid rgba(192,57,43,0.3);
+  border-radius: 2px;
+  font-size: 13px;
+  color: var(--neg);
+}
+[data-theme="dark"] .create-confirm-warn {
+  background: rgba(248,81,73,0.12);
+  border-color: rgba(248,81,73,0.35);
+  color: #ff7b72;
+}
+[data-theme="dark"] .create-confirm-banner.testnet { background: #238636; }
+
 /* Theme toggle in dark */
 [data-theme="dark"] .theme-toggle {
   background: var(--subtle);

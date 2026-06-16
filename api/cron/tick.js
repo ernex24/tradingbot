@@ -86,25 +86,50 @@ async function placeMarket(creds, testnet, symbol, side, args) {
     err.cause = e
     throw err
   }
+  // Track fees so net wallet amounts match reality. On Binance Spot:
+  //   - BUY:  default fee is paid in the BOUGHT asset (the base, e.g. BTC).
+  //           Your wallet receives executedQty - feeInBase.
+  //   - SELL: default fee is paid in the QUOTE asset (USDT).
+  //           Your wallet receives cummulativeQuoteQty - feeInQuote.
+  //   - If BNB-fee-discount is enabled, commissionAsset = BNB and neither
+  //     the base nor quote balance is reduced (BNB is debited separately).
+  // Tracking gross-only causes the bot's internal state to drift higher
+  // than the real wallet over time, producing -2010 insufficient balance.
+  const baseAsset = symbol.endsWith('USDT') ? symbol.slice(0, -4) : null
+  const quoteAsset = 'USDT'
   let totalQty = 0, totalCost = 0
+  let feeInBase = 0, feeInQuote = 0
   for (const f of result.fills || []) {
     const q = +f.qty
     totalQty += q
     totalCost += q * (+f.price)
+    const c = +f.commission || 0
+    if (f.commissionAsset === baseAsset) feeInBase += c
+    else if (f.commissionAsset === quoteAsset) feeInQuote += c
+    // BNB or other asset → no adjustment to base/quote balances
   }
   const avgPrice = totalQty > 0 ? totalCost / totalQty : null
+  const executedQty = +result.executedQty
+  const cummQuote = +result.cummulativeQuoteQty
   return {
     orderId: result.orderId,
-    executedQty: +result.executedQty,
-    cummulativeQuoteQty: +result.cummulativeQuoteQty,
+    executedQty,
+    cummulativeQuoteQty: cummQuote,
     avgPrice,
+    netQty: Math.max(0, executedQty - feeInBase),
+    netQuote: Math.max(0, cummQuote - feeInQuote),
+    feeInBase,
+    feeInQuote,
   }
 }
 
 function applyEntry(state, side, order, currentTime, stopPct, takePct) {
-  const qty = order.executedQty
+  // qty = what's actually in the wallet (executedQty minus fee paid in base).
+  // invested = full USDT debited from the wallet (this side of the fee is
+  // baked into cummulativeQuoteQty already).
+  const qty = order.netQty ?? order.executedQty
   const invested = order.cummulativeQuoteQty
-  const entryPrice = order.avgPrice ?? (invested / qty)
+  const entryPrice = order.avgPrice ?? (invested / order.executedQty)
   const slPrice = stopPct > 0 ? entryPrice * (1 - side * stopPct / 100) : null
   const tpPrice = takePct > 0 ? entryPrice * (1 + side * takePct / 100) : null
   return {
@@ -122,8 +147,11 @@ function applyEntry(state, side, order, currentTime, stopPct, takePct) {
 function applyExit(state, exitPriceFallback, currentTime, reason, order) {
   const op = state.openPosition
   if (!op) return { state, trade: null }
-  const proceeds = order.cummulativeQuoteQty
-  const exitPrice = order.avgPrice ?? (proceeds / order.executedQty) ?? exitPriceFallback
+  // proceeds = USDT actually credited to the wallet (gross minus the
+  // quote-side fee). Cash is incremented by this number — anything else
+  // makes the bot's tracked balance drift above reality.
+  const proceeds = order.netQuote ?? order.cummulativeQuoteQty
+  const exitPrice = order.avgPrice ?? (order.cummulativeQuoteQty / order.executedQty) ?? exitPriceFallback
   const grossPnL = op.invested * op.side * (exitPrice - op.entryPrice) / op.entryPrice
   const pnlUSD = proceeds - op.invested
   const feeUSD = Math.max(0, grossPnL - pnlUSD)

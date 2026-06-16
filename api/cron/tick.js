@@ -298,18 +298,43 @@ async function tickBot(admin, row) {
 }
 
 export default async function handler(req, res) {
-  // Auth: shared secret from external cron service
-  const auth = req.headers?.authorization || req.headers?.Authorization || ''
+  // GET with no auth → liveness probe. Confirms deploy + env without
+  // running anything. Useful for verifying the endpoint exists before
+  // wiring the cron service.
+  if (req.method === 'GET' && !req.query?.token && !(req.headers?.authorization || req.headers?.Authorization)) {
+    res.statusCode = 200
+    res.setHeader('Content-Type', 'application/json')
+    return res.end(JSON.stringify({
+      ok: true,
+      endpoint: 'cron/tick',
+      secretConfigured: !!process.env.CRON_SECRET,
+      hint: 'POST with Authorization: Bearer <CRON_SECRET> — or GET with ?token=<CRON_SECRET>',
+    }))
+  }
+
+  // Auth: shared secret from external cron service.
+  // Accept either an Authorization: Bearer header (preferred) OR a
+  // ?token= query param (fallback for cron services that strip custom
+  // headers). The query-param form is fine here because the URL travels
+  // over TLS and the secret is rotated independently of user data.
   const secret = process.env.CRON_SECRET
   if (!secret) {
     res.statusCode = 500
     res.setHeader('Content-Type', 'application/json')
-    return res.end(JSON.stringify({ error: 'CRON_SECRET not configured' }))
+    return res.end(JSON.stringify({ error: 'CRON_SECRET not configured on the server' }))
   }
-  if (auth !== `Bearer ${secret}`) {
+  const auth = req.headers?.authorization || req.headers?.Authorization || ''
+  const headerMatch = auth === `Bearer ${secret}`
+  const queryMatch = req.query?.token && String(req.query.token) === secret
+  if (!headerMatch && !queryMatch) {
     res.statusCode = 401
     res.setHeader('Content-Type', 'application/json')
-    return res.end(JSON.stringify({ error: 'unauthorized' }))
+    return res.end(JSON.stringify({
+      error: 'unauthorized',
+      hint: auth
+        ? 'Authorization header was received but did not match CRON_SECRET. Check for extra whitespace and exact secret value.'
+        : 'No Authorization header detected. Either send "Authorization: Bearer <CRON_SECRET>" or call with "?token=<CRON_SECRET>".',
+    }))
   }
 
   const admin = getAdminClient()

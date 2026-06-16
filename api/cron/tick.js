@@ -56,16 +56,36 @@ async function loadKey(admin, userId, testnet) {
   } catch { return null }
 }
 
+function describeOrder(side, symbol, args) {
+  if (args.quoteOrderQty) {
+    return `${side} ${(+args.quoteOrderQty).toFixed(2)} USDT of ${symbol}`
+  }
+  if (args.quantity) {
+    return `${side} ${args.quantity} ${symbol}`
+  }
+  return `${side} ${symbol}`
+}
+
 async function placeMarket(creds, testnet, symbol, side, args) {
   const params = {
     symbol, side, type: 'MARKET',
     newOrderRespType: 'FULL',
     ...args,
   }
-  const result = await binanceSigned({
-    apiKey: creds.apiKey, apiSecret: creds.apiSecret, testnet,
-    method: 'POST', path: '/api/v3/order', params,
-  })
+  const intent = describeOrder(side, symbol, args)
+  let result
+  try {
+    result = await binanceSigned({
+      apiKey: creds.apiKey, apiSecret: creds.apiSecret, testnet,
+      method: 'POST', path: '/api/v3/order', params,
+    })
+  } catch (e) {
+    const inner = e?.message || String(e)
+    const err = new Error(`Tried to ${intent} — ${inner}`)
+    err.orderIntent = intent
+    err.cause = e
+    throw err
+  }
   let totalQty = 0, totalCost = 0
   for (const f of result.fills || []) {
     const q = +f.qty
@@ -357,13 +377,24 @@ export default async function handler(req, res) {
     try {
       const { state, skipped, error: tickErr, events } = await tickBot(admin, row)
       if (state) {
+        const prevError = row.state?.lastError || null
         await admin
           .from('user_bots')
           .update({ state, updated_at: new Date().toISOString() })
           .eq('user_id', row.user_id)
           .eq('client_id', id)
+        if (prevError && !state.lastError) {
+          const networkTag = row.config?.testnet === false ? '<b>MAINNET</b>' : 'TESTNET'
+          await sendTelegram(
+            admin,
+            row.user_id,
+            `✅ <b>Bot recovered</b> · ${row.name}\n${networkTag}\nLast error cleared — bot is ticking normally again.`,
+          )
+        }
         results.push({ id, ok: true, events })
       } else if (tickErr) {
+        const prevError = row.state?.lastError || null
+        const errorChanged = prevError !== tickErr
         await admin
           .from('user_bots')
           .update({
@@ -372,6 +403,14 @@ export default async function handler(req, res) {
           })
           .eq('user_id', row.user_id)
           .eq('client_id', id)
+        if (errorChanged) {
+          const networkTag = row.config?.testnet === false ? '<b>MAINNET</b>' : 'TESTNET'
+          await sendTelegram(
+            admin,
+            row.user_id,
+            `⚠ <b>Bot can't tick</b> · ${row.name}\n${networkTag}\n${tickErr}`,
+          )
+        }
         results.push({ id, skipped, error: tickErr })
       } else {
         results.push({ id, skipped: skipped || 'noop' })
@@ -379,31 +418,30 @@ export default async function handler(req, res) {
     } catch (e) {
       const msg = String(e?.message || e)
       console.error(`bot ${id} tick error:`, msg)
-      // Auto-pause on errors that can never recover by retrying.
-      // These all mean "the current config is incompatible with the
-      // account state". Re-trying every minute just spams Binance and
-      // the bot card with the same error. Pause and Telegram the user
-      // so they intervene.
-      const fatal = /insufficient balance|Filter failure: NOTIONAL|Filter failure: LOT_SIZE|Filter failure: MIN_NOTIONAL|Invalid API-key|permissions for action/i.test(msg)
-      const update = {
-        state: { ...(row.state || {}), lastError: msg, lastTickAt: Date.now() },
-        updated_at: new Date().toISOString(),
-      }
-      if (fatal) update.running = false
+      // Keep the bot RUNNING on error — pausing would also stop SL/TP
+      // monitoring on any open position, which is the riskier outcome.
+      // Surface the error in state.lastError and Telegram only on
+      // *transitions* (new error or message changed) so a stuck bot
+      // doesn't notify every minute.
+      const prevError = row.state?.lastError || null
+      const errorChanged = prevError !== msg
       await admin
         .from('user_bots')
-        .update(update)
+        .update({
+          state: { ...(row.state || {}), lastError: msg, lastTickAt: Date.now() },
+          updated_at: new Date().toISOString(),
+        })
         .eq('user_id', row.user_id)
         .eq('client_id', id)
-      if (fatal) {
+      if (errorChanged) {
         const networkTag = row.config?.testnet === false ? '<b>MAINNET</b>' : 'TESTNET'
         await sendTelegram(
           admin,
           row.user_id,
-          `🛑 <b>Bot paused</b> · ${row.name}\n${networkTag}\n${msg}\n\nFix the config or top up the wallet, then resume the bot.`,
+          `⚠ <b>Bot tick failed</b> · ${row.name}\n${networkTag}\n${msg}\n\nThe bot keeps running — open positions are still monitored for SL/TP. Fix the underlying issue (top up wallet, adjust config) and the next tick will retry.`,
         )
       }
-      results.push({ id, error: msg, paused: !!fatal })
+      results.push({ id, error: msg })
     }
   }
 

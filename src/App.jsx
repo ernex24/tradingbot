@@ -728,6 +728,28 @@ export default function App() {
       if (!bot || !bot.running) return
       if (candles.length < 2) return
       const cfg = bot.config
+      const last = candles[candles.length - 1]
+
+      // Server-managed bots: the cron is authoritative for execution.
+      // The browser only refreshes the candle buffer + live price so
+      // the chart and floating P&L stay current; never call the
+      // executor or emit notifications from here.
+      if (bot.serverManaged !== false) {
+        if (cancelled) return
+        setBots(prev => prev.map(b =>
+          b.id === botId
+            ? {
+                ...b,
+                state: {
+                  ...b.state,
+                  candles: candles.slice(-300),
+                  lastPrice: last.c,
+                },
+              }
+            : b
+        ))
+        return
+      }
 
       let signal = bot.state.openPosition?.side ?? 0
       if (signalEvaluation) {
@@ -737,7 +759,6 @@ export default function App() {
         signal = pos[pos.length - 1] | 0
       }
 
-      const last = candles[candles.length - 1]
       const opts = {
         stopPct: cfg.stopPct,
         takePct: cfg.takePct,
@@ -844,9 +865,10 @@ export default function App() {
 
     for (const bot of botsRef.current) {
       if (!bot.running) continue
-      // Server-managed bots tick from the cron endpoint, not the browser.
-      // The browser only renders their state, polled from Supabase.
-      if (bot.serverManaged !== false) continue
+      // The browser still subscribes to the candle stream so charts and
+      // floating P&L update live. For server-managed bots, runStrategyAndTick
+      // short-circuits before placing any orders — the cron is the only
+      // executor.
       if (bot.config.source === 'binance') setupStream(bot)
       else setupPoll(bot)
     }

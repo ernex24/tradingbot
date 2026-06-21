@@ -4,6 +4,7 @@
 import { decrypt } from '../_lib/encryption.js'
 import { binanceSigned } from '../_lib/binanceSign.js'
 import { getAdminClient, requireUser, jsonResponse } from '../_lib/supabaseServer.js'
+import { prepareSell, prepareBuy } from '../_lib/binanceFilters.js'
 
 async function loadKey(admin, userId, testnet) {
   const { data: row } = await admin
@@ -77,10 +78,36 @@ async function order(req, res, user, admin) {
   const k = await loadKey(admin, user.user_id, isTestnet)
   if (!k) return jsonResponse(res, 404, { error: 'no Binance key configured' })
 
-  const params = { symbol: symbol.toUpperCase(), side, type }
+  const upperSymbol = symbol.toUpperCase()
+  const params = { symbol: upperSymbol, side, type }
   if (type === 'MARKET') {
-    if (quoteOrderQty) params.quoteOrderQty = String(quoteOrderQty)
-    else params.quantity = String(quantity)
+    // Server-side pre-flight: snap to symbol filters + cap at the
+    // actual wallet balance so the browser can't ask for a quantity
+    // that LOT_SIZE or insufficient-balance would reject. Same gate
+    // the cron uses internally.
+    try {
+      if (side === 'SELL' && quantity != null) {
+        params.quantity = await prepareSell({
+          creds: { apiKey: k.apiKey, apiSecret: k.apiSecret },
+          testnet: isTestnet,
+          symbol: upperSymbol,
+          wantQty: quantity,
+        })
+      } else if (side === 'BUY' && quoteOrderQty != null) {
+        params.quoteOrderQty = await prepareBuy({
+          creds: { apiKey: k.apiKey, apiSecret: k.apiSecret },
+          testnet: isTestnet,
+          symbol: upperSymbol,
+          plannedQuote: quoteOrderQty,
+        })
+      } else if (quoteOrderQty) {
+        params.quoteOrderQty = String(quoteOrderQty)
+      } else {
+        params.quantity = String(quantity)
+      }
+    } catch (e) {
+      return jsonResponse(res, 400, { error: e.message })
+    }
   } else {
     params.quantity = String(quantity)
     params.price = String(price)

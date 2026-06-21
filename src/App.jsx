@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { DEMO_CANDLES } from './lib/demoData.js'
 import { STRATS } from './lib/strategies.js'
 import { backtest } from './lib/backtest.js'
-import { coinByPair } from './lib/coins.js'
+import { coinByPair, coinAvailableOn } from './lib/coins.js'
 import { createInitialState, floatingPnL } from './lib/paperTrader.js'
 import { executeTick as binanceTick, executorSupportsCoin, closeOpenPosition } from './lib/binanceExecutor.js'
 import { binanceStream } from './lib/binanceStream.js'
@@ -1084,15 +1084,18 @@ export default function App() {
                 disabled={
                   !!paramError || !!rangeWarn ||
                   !executorSupportsCoin(coin.symbol) ||
+                  !coinAvailableOn(coin, 'testnet') ||
                   effectiveDirection !== 'long'
                 }
                 title={
                   paramError || rangeWarn ? 'Fix the warnings first' :
                   !executorSupportsCoin(coin.symbol)
                     ? `${coin.symbol} is not available on Binance Spot`
-                    : effectiveDirection !== 'long'
-                      ? 'Binance Spot only supports long positions'
-                      : 'Execute this strategy live against Binance Testnet (fake money)'
+                    : !coinAvailableOn(coin, 'testnet')
+                      ? `${coin.symbol} is not on Binance Spot Testnet — create a Mainnet bot instead`
+                      : effectiveDirection !== 'long'
+                        ? 'Binance Spot only supports long positions'
+                        : 'Execute this strategy live against Binance Testnet (fake money)'
                 }
               >
                 + Create Testnet bot
@@ -1105,9 +1108,14 @@ export default function App() {
                 disabled={
                   !!paramError || !!rangeWarn ||
                   !executorSupportsCoin(coin.symbol) ||
+                  !coinAvailableOn(coin, 'mainnet') ||
                   effectiveDirection !== 'long'
                 }
-                title="Execute this strategy live against Binance MAINNET — REAL MONEY"
+                title={
+                  !coinAvailableOn(coin, 'mainnet')
+                    ? `${coin.symbol} is not available on Binance Spot Mainnet`
+                    : 'Execute this strategy live against Binance MAINNET — REAL MONEY'
+                }
               >
                 + Create MAINNET bot
               </button>

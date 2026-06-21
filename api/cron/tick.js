@@ -27,6 +27,53 @@ const COIN_TO_SYMBOL = {
 const MAINNET = 'https://api.binance.com'
 const TESTNET = 'https://testnet.binance.vision'
 
+// Per-symbol exchangeInfo cache. Survives across ticks while the
+// Vercel function stays warm — exchangeInfo rarely changes, so a
+// cold-start refresh is fine.
+const filterCache = new Map() // `${testnet?'t':'m'}-${symbol}` -> filters
+
+async function loadFilters(testnet, symbol) {
+  const key = `${testnet ? 't' : 'm'}-${symbol}`
+  if (filterCache.has(key)) return filterCache.get(key)
+  const base = testnet ? TESTNET : MAINNET
+  const r = await fetch(`${base}/api/v3/exchangeInfo?symbol=${symbol}`, {
+    signal: AbortSignal.timeout(8000),
+  })
+  if (!r.ok) throw new Error(`exchangeInfo HTTP ${r.status}`)
+  const data = await r.json()
+  const info = (data.symbols || [])[0]
+  if (!info) throw new Error(`exchangeInfo: no symbol ${symbol}`)
+  const lot = info.filters.find(f => f.filterType === 'LOT_SIZE')
+  const notional = info.filters.find(f => f.filterType === 'NOTIONAL' || f.filterType === 'MIN_NOTIONAL')
+  const filters = {
+    stepSize: +(lot?.stepSize || '0.00000001'),
+    minQty: +(lot?.minQty || '0'),
+    minNotional: +(notional?.minNotional || '0'),
+  }
+  filterCache.set(key, filters)
+  return filters
+}
+
+async function loadAssetBalance(creds, testnet, asset) {
+  const account = await binanceSigned({
+    apiKey: creds.apiKey, apiSecret: creds.apiSecret, testnet,
+    path: '/api/v3/account',
+  })
+  const b = (account?.balances || []).find(x => x.asset === asset)
+  return b ? +b.free : 0
+}
+
+// Floor `qty` to a multiple of `stepSize`, formatted with the right
+// number of decimals so Binance's LOT_SIZE filter accepts it without
+// floating-point noise. e.g. stepRoundDown(0.01598, 0.001) -> "0.015".
+function stepRoundDown(qty, stepSize) {
+  if (!stepSize || stepSize <= 0) return String(qty)
+  const steps = Math.floor(qty / stepSize)
+  const value = steps * stepSize
+  const decimals = Math.max(0, Math.round(-Math.log10(stepSize)))
+  return value.toFixed(decimals)
+}
+
 async function fetchCandles(symbol, interval, limit, testnet) {
   const base = testnet ? TESTNET : MAINNET
   const url = `${base}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
@@ -250,6 +297,7 @@ async function tickBot(admin, row) {
   if (!STRATS[cfg.stratKey]) return { skipped: 'unknown strategy' }
 
   const isTestnet = cfg.testnet !== false
+  const baseAsset = symbol.endsWith('USDT') ? symbol.slice(0, -4) : symbol
   const candles = await fetchCandles(symbol, cfg.interval, 200, isTestnet)
   if (candles.length < 2) return { skipped: 'no candles' }
 
@@ -281,6 +329,35 @@ async function tickBot(admin, row) {
 
   const events = []
 
+  // Pre-flight helpers — pull live wallet + symbol filters so the
+  // qty we send to Binance is always (1) ≤ what's actually in the
+  // wallet and (2) a valid multiple of the symbol's stepSize.
+  const filters = await loadFilters(isTestnet, symbol)
+
+  const prepareSell = async (wantQty) => {
+    const walletFree = await loadAssetBalance(creds, isTestnet, baseAsset)
+    const capped = Math.min(wantQty, walletFree)
+    const qtyStr = stepRoundDown(capped, filters.stepSize)
+    const qtyNum = +qtyStr
+    if (qtyNum < filters.minQty) {
+      throw new Error(`Cannot SELL ${qtyNum} ${baseAsset}: below symbol minQty ${filters.minQty} (wallet free: ${walletFree})`)
+    }
+    if (qtyNum * currentPrice < filters.minNotional) {
+      throw new Error(`Cannot SELL ${qtyNum} ${baseAsset} ≈ ${(qtyNum * currentPrice).toFixed(2)} USDT: below symbol minNotional ${filters.minNotional}`)
+    }
+    return qtyStr
+  }
+
+  const prepareBuy = async (plannedQuote) => {
+    const usdtFree = await loadAssetBalance(creds, isTestnet, 'USDT')
+    // Hold back 0.1% for the fee on the BUY side so we never over-spend.
+    const cappedQuote = Math.min(plannedQuote, usdtFree * 0.999)
+    if (cappedQuote < filters.minNotional) {
+      throw new Error(`Cannot BUY: ${cappedQuote.toFixed(2)} USDT below symbol minNotional ${filters.minNotional} (wallet free: ${usdtFree.toFixed(2)})`)
+    }
+    return cappedQuote.toFixed(2)
+  }
+
   // SL/TP intrabar (long-only on Spot)
   if (state.openPosition && state.openPosition.side === 1) {
     const op = state.openPosition
@@ -288,7 +365,8 @@ async function tickBot(admin, row) {
     if (op.slPrice != null && last.l <= op.slPrice) trigger = { px: op.slPrice, reason: 'SL' }
     else if (op.tpPrice != null && last.h >= op.tpPrice) trigger = { px: op.tpPrice, reason: 'TP' }
     if (trigger) {
-      const order = await placeMarket(creds, isTestnet, symbol, 'SELL', { quantity: op.qty.toFixed(8) })
+      const qtyStr = await prepareSell(op.qty)
+      const order = await placeMarket(creds, isTestnet, symbol, 'SELL', { quantity: qtyStr })
       const { state: nextState, trade } = applyExit(state, trigger.px, currentTime, trigger.reason, order)
       state = nextState
       if (trade) {
@@ -303,9 +381,8 @@ async function tickBot(admin, row) {
   const currentSide = state.openPosition?.side ?? 0
   if (desired !== currentSide) {
     if (state.openPosition) {
-      const order = await placeMarket(creds, isTestnet, symbol, 'SELL', {
-        quantity: state.openPosition.qty.toFixed(8),
-      })
+      const qtyStr = await prepareSell(state.openPosition.qty)
+      const order = await placeMarket(creds, isTestnet, symbol, 'SELL', { quantity: qtyStr })
       const { state: nextState, trade } = applyExit(state, currentPrice, currentTime, 'signal', order)
       state = nextState
       if (trade) {
@@ -315,9 +392,10 @@ async function tickBot(admin, row) {
     }
     if (desired === 1) {
       const room = state.cash * 0.99
-      const quoteAmt = compound ? room : Math.min(fixedStake, room)
-      if (quoteAmt > 1) {
-        const order = await placeMarket(creds, isTestnet, symbol, 'BUY', { quoteOrderQty: quoteAmt.toFixed(2) })
+      const plannedQuote = compound ? room : Math.min(fixedStake, room)
+      if (plannedQuote > 1) {
+        const quoteStr = await prepareBuy(plannedQuote)
+        const order = await placeMarket(creds, isTestnet, symbol, 'BUY', { quoteOrderQty: quoteStr })
         state = applyEntry(state, 1, order, currentTime, stopPct, takePct)
         events.push({ kind: 'entry', openPos: state.openPosition })
       }

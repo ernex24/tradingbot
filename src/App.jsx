@@ -74,6 +74,10 @@ export default function App() {
 
   const [bots, setBots] = useState(() => loadBots())
   const [usdtBalance, setUsdtBalance] = useState(null)
+  // Full balance list for the active network. Drives the hover tooltip
+  // on the header USDT cell so the user can see every asset balance
+  // without leaving the page.
+  const [allBalances, setAllBalances] = useState([])
   const [dailyLossLimit, setDailyLossLimit] = useState(null)
   const [reconciliationWarnings, setReconciliationWarnings] = useState({})
   const [networkView, setNetworkView] = useState('testnet')
@@ -552,20 +556,26 @@ export default function App() {
     if (!supabase) return
     let cancelled = false
     setUsdtBalance(null)
+    setAllBalances([])
     const testnetFlag = networkView === 'testnet' ? 1 : 0
     const load = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (!session) {
-          if (!cancelled) setUsdtBalance(null)
+          if (!cancelled) {
+            setUsdtBalance(null)
+            setAllBalances([])
+          }
           return
         }
         const r = await authFetch(`/api/binance/balance?testnet=${testnetFlag}`)
         if (!r.ok) return
         const data = await r.json()
         if (cancelled) return
-        const usdt = (data.balances || []).find(b => b.asset === 'USDT')
+        const balances = data.balances || []
+        const usdt = balances.find(b => b.asset === 'USDT')
         setUsdtBalance(usdt ? usdt.total : 0)
+        setAllBalances(balances)
       } catch { /* ignore */ }
     }
     load()
@@ -989,11 +999,34 @@ export default function App() {
               </div>
             </div>
             <div className="header-stats">
-              <div className="hstat">
+              <div className="hstat balance-cell">
                 <div className="label">USDT balance ({networkView})</div>
                 <div className="value">
                   {usdtBalance == null ? '—' : usdPrecise(usdtBalance)}
                 </div>
+                {allBalances.length > 0 && (
+                  <div className="balance-pop" role="tooltip">
+                    <div className="balance-pop-head">
+                      All balances · {networkView}
+                    </div>
+                    <table className="balance-pop-table">
+                      <tbody>
+                        {allBalances
+                          .slice()
+                          .sort((a, b) => (b.total || 0) - (a.total || 0))
+                          .map(b => (
+                            <tr key={b.asset}>
+                              <td>{b.asset}</td>
+                              <td className="num">{(+b.total).toLocaleString('en-US', {
+                                maximumFractionDigits: 8,
+                                minimumFractionDigits: 2,
+                              })}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
               <div className="hstat">
                 <div className="label">Unrealised P&amp;L</div>

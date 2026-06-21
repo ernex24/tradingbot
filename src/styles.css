@@ -133,6 +133,64 @@ header .meta { text-align: right; font-size: 13px; color: var(--mute); }
 .hstat .value.neg { color: var(--neg); }
 .hstat .value.mute { color: var(--mute); }
 
+.balance-cell { position: relative; cursor: default; }
+.balance-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  min-width: 240px;
+  max-width: 320px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  padding: 10px 12px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.balance-cell:hover .balance-pop,
+.balance-cell:focus-within .balance-pop {
+  opacity: 1;
+  transform: translateY(0);
+}
+.balance-pop-head {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--mute);
+  font-weight: 600;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.balance-pop-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.balance-pop-table td {
+  padding: 4px 0;
+  vertical-align: top;
+}
+.balance-pop-table td:first-child {
+  color: var(--mute);
+  font-weight: 500;
+  padding-right: 12px;
+}
+.balance-pop-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+[data-theme="dark"] .balance-pop {
+  background: var(--subtle);
+  border-color: var(--line);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
 .controls {
   display: flex;
   flex-direction: column;

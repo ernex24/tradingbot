@@ -79,6 +79,10 @@ export default function App() {
   const [networkView, setNetworkView] = useState('testnet')
   const [backtestStarted, setBacktestStarted] = useState(false)
   const [pendingCreate, setPendingCreate] = useState(null)
+  // All historical trades on the user's account, persisted across bot
+  // deletions. Feeds the Bots tab KPI ribbon so lifetime totals per
+  // network survive even when bots are deleted.
+  const [allTrades, setAllTrades] = useState([])
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'light'
     return localStorage.getItem('trendbot.theme') || 'light'
@@ -416,7 +420,11 @@ export default function App() {
         const r = await authFetch('/api/trades/list')
         if (!r.ok) return
         const { trades = [] } = await r.json()
-        if (cancelled || !trades.length) return
+        if (cancelled) return
+        // Cache the lifetime trade list — drives the Bots tab KPI ribbon
+        // so totals stay accurate even after the originating bot is gone.
+        setAllTrades(trades)
+        if (!trades.length) return
         const byBot = new Map()
         for (const t of trades) {
           const key = `${t.botId}|${t.entryTime}|${t.exitTime}`
@@ -445,7 +453,17 @@ export default function App() {
     }
     supabase.auth.getSession().then(({ data }) => load(data.session))
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => load(s))
-    return () => { cancelled = true; sub?.subscription?.unsubscribe?.() }
+    // Refresh lifetime trades every 60s so deletes / new closes surface
+    // in the persistent KPI ribbon without a manual reload.
+    const poll = setInterval(async () => {
+      const { data } = await supabase.auth.getSession()
+      load(data.session)
+    }, 60_000)
+    return () => {
+      cancelled = true
+      clearInterval(poll)
+      sub?.subscription?.unsubscribe?.()
+    }
   }, [])
 
   // Settings load (daily limit, Telegram on/off flags) --------------
@@ -1131,6 +1149,9 @@ export default function App() {
             bots={networkBots}
             allBotsCount={bots.length}
             networkView={networkView}
+            networkTrades={allTrades.filter(t =>
+              (t.testnet !== false) === (networkView === 'testnet')
+            )}
             onToggleBot={handleToggleBot}
             onDeleteBot={handleDeleteBot}
             onCloseBotPosition={handleCloseBotPosition}

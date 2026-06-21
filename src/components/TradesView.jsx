@@ -6,15 +6,23 @@ import { STRATS } from '../lib/strategies.js'
 import { COM } from '../lib/backtest.js'
 import PriceChart from './PriceChart.jsx'
 
-function computeTotals(bots) {
-  return bots.reduce((acc, bot) => {
-    for (const t of bot.state.closedTrades) {
-      acc.invested += t.invested
-      acc.fees += t.feeUSD || 0
-      acc.pnl += t.pnlUSD
-      acc.trades += 1
-      if (t.pnlUSD > 0) acc.wins += 1
-    }
+// Lifetime totals from the persistent trade history (survives bot
+// deletes) plus live open positions and starting capital from the
+// bots currently on this network.
+function computeTotals(bots, networkTrades = []) {
+  const acc = {
+    invested: 0, fees: 0, pnl: 0, trades: 0, wins: 0,
+    openInvested: 0, openCount: 0, openFloating: 0,
+    startBalance: 0,
+  }
+  for (const t of networkTrades) {
+    acc.invested += +t.invested || 0
+    acc.fees += +t.feeUSD || 0
+    acc.pnl += +t.pnlUSD || 0
+    acc.trades += 1
+    if ((+t.pnlUSD || 0) > 0) acc.wins += 1
+  }
+  for (const bot of bots) {
     if (bot.state.openPosition) {
       acc.openInvested += bot.state.openPosition.invested
       acc.openCount += 1
@@ -23,19 +31,19 @@ function computeTotals(bots) {
       }
     }
     acc.startBalance += bot.state.startBalance
-    return acc
-  }, {
-    invested: 0, fees: 0, pnl: 0, trades: 0, wins: 0,
-    openInvested: 0, openCount: 0, openFloating: 0,
-    startBalance: 0,
-  })
+  }
+  return acc
 }
 
 function KPIRibbon({ totals }) {
   const losses = totals.trades - totals.wins
   const winRate = totals.trades > 0 ? (totals.wins / totals.trades) * 100 : 0
-  const realizedReturnPct = totals.startBalance > 0
-    ? (totals.pnl / totals.startBalance) * 100
+  // Return % uses startBalance from live bots when available; falls back
+  // to total invested for an all-time-on-capital-deployed read when the
+  // originating bots have been deleted.
+  const returnDenom = totals.startBalance > 0 ? totals.startBalance : totals.invested
+  const realizedReturnPct = returnDenom > 0
+    ? (totals.pnl / returnDenom) * 100
     : 0
   const netCls = totals.pnl >= 0 ? 'pos' : 'neg'
   const floatCls = totals.openFloating >= 0 ? 'pos' : 'neg'
@@ -743,16 +751,21 @@ function BotCard({ bot, onToggle, onDelete, onCloseBotPosition, reconciliationWa
 
 export default function TradesView({
   bots, allBotsCount = bots.length, networkView,
+  networkTrades = [],
   onToggleBot, onDeleteBot, onCloseBotPosition,
   reconciliationWarnings = {},
 }) {
   const [sortBy, setSortBy] = useState('newest')
-  const totals = useMemo(() => computeTotals(bots), [bots])
+  const totals = useMemo(() => computeTotals(bots, networkTrades), [bots, networkTrades])
   const sortedBots = useMemo(() => sortBots(bots, sortBy), [bots, sortBy])
+  // Show the ribbon whenever there's lifetime data on this network,
+  // even if every bot has been deleted — the persistent totals are
+  // exactly the value the user asked for.
+  const hasData = bots.length > 0 || networkTrades.length > 0
 
   return (
     <div className="trades-view">
-      {bots.length > 0 && <KPIRibbon totals={totals} />}
+      {hasData && <KPIRibbon totals={totals} />}
 
       <div className="trades-head">
         <div>

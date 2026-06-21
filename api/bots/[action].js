@@ -61,18 +61,17 @@ async function remove(req, res, user, admin) {
   if (req.method !== 'POST') return jsonResponse(res, 405, { error: 'method not allowed' })
   const { id } = req.body || {}
   if (!id) return jsonResponse(res, 400, { error: 'missing id' })
+  // Delete the bot row but PRESERVE its trades in bot_trades so the
+  // network's lifetime KPIs (realized P&L, total invested, fees, W/L)
+  // survive deletion. Each trade row already carries bot_name +
+  // symbol + testnet, so it's self-contained.
   const { error: botErr } = await admin
     .from('user_bots')
     .delete()
     .eq('user_id', user.user_id)
     .eq('client_id', String(id))
-  const { error: tradeErr } = await admin
-    .from('bot_trades')
-    .delete()
-    .eq('user_id', user.user_id)
-    .eq('bot_id', String(id))
-  if (botErr || tradeErr) {
-    console.error('bots/delete db error:', botErr || tradeErr)
+  if (botErr) {
+    console.error('bots/delete db error:', botErr)
     return jsonResponse(res, 500, { error: 'failed to delete' })
   }
   return jsonResponse(res, 200, { deleted: true })
